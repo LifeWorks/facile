@@ -1,7 +1,7 @@
 Testing class: Reaction
 Creating rx1 object: {
   'Reaction' => {
-                  'is_rate_law_flag' => 1,
+                  'is_rate_law_flag' => 0,
                   'substrate_names_ref' => [
                                              'X',
                                              'Y'
@@ -10,7 +10,7 @@ Creating rx1 object: {
                   'product_names_ref' => [
                                            'Z'
                                          ],
-                  'velocity' => 'f1',
+                  'velocity' => 'f1*X*Y',
                   'index' => 0,
                   'dependent_reactions_ref' => [],
                   'easystoch_dynrate_order' => 0,

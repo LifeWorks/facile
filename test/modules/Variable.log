@@ -1,6 +1,8 @@
 Testing class: Variable
-Creating var1 object: {
+Testing Variable object creation: {
   'Variable' => {
+                  'is_dynamic_flag' => 0,
+                  'is_extern_flag' => 0,
                   'is_expression_flag' => 0,
                   'value' => '1',
                   'name' => 'f1',
@@ -12,9 +14,23 @@ Creating var1 object: {
                   'is_bifurcation_parameter_flag' => 0
                 }
 };
-Done testing class: Variable
 
 Testing square() and eval_expression():
+{
+  'Variable' => {
+                  'is_dynamic_flag' => 0,
+                  'is_extern_flag' => 0,
+                  'is_expression_flag' => 1,
+                  'value' => '0.5*(square(2*pi*t,30)+1)',
+                  'name' => 'f2',
+                  'probe_flag' => 0,
+                  'source_line' => 'f2=f1*0.5*(square(2*pi*t,30)+1)',
+                  'index' => 1,
+                  'dimension' => 2,
+                  'type' => 'rate',
+                  'is_bifurcation_parameter_flag' => 0
+                }
+};
 t=10.3, f(t)=0
 t=-45, f(t)=0
 t=9.99, f(t)=0
@@ -33,3 +49,4 @@ t=170.499, f(t)=1
 t=170.5, f(t)=0
 t=170.51, f(t)=0
 Done resting square() and eval_expression().
+Done testing class: Variable

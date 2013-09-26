@@ -73,7 +73,7 @@
 %          The stopping condition is a component-wise check based on the
 %          following formula:
 %
-%          dy/dt * SS_timescale < max(SS_RelTol * abs(y), SS_AbsTol)
+%          dy/dt * SS_timescale < SS_RelTol * max(abs(y), SS_AbsTol)
 %
 %          This condition ensures that the significant digits of the
 %          solution vector y, as specified by SS_RelTol, are unchanging
@@ -82,8 +82,8 @@
 %          because the digits below the Matlab's AbsTol threshold are not 
 %          accurate, (c.f. odeset documentation for an explanation of
 %          AbsTol) enforcement of the condition is relaxed as |y|
-%          approachesSS_AbsTol. Once the stopping condition is true for all
-%          solution components, integration is halted.
+%          goes below SS_AbsTol. Once the stopping condition is true for
+%          all solution components, integration is halted.
 %
 %          The integration will terminate if t=tf, or earlier if the
 %          last event is to find the steady-state (i.e. eventn=0) and the
@@ -91,6 +91,13 @@
 %          only N intervals are integrated instead of (N+1). Therefore when
 %          simulating to steady-state, tf acts as a timeout value for the
 %          integration rather than specifying the final integration time.
+%
+%          If a steady-state event is followed by another positive-valued
+%          event time, then this absolute event time acts as the timeout
+%          value for the steady-state event. So events=[10,0,100,1000] means
+%          integrate until t=10, then integrate to steady-state or t=100
+%          whichever occurs first, then integrate to t=100 (assuming that
+%          steady-state was reached), then integrate to t=1000.
 %
 %          The simplest situation involving finding the steady-state is to
 %          specify a single steady-state event and a timeout.  For example,
@@ -252,7 +259,11 @@ for i = 1:length(events)-1
         break;
     end
     if (next_event_time > 0 && next_event_time > last_event_time)  % regular integration interval?
-        TV = [last_event_time tv(find(tv > last_event_time & tv < next_event_time)) next_event_time];
+        % use eps() epsilon to avoid an event time being included twice in
+        % TV just because of small representation errors in tv
+        TV = [last_event_time ...
+            tv(tv > (last_event_time+eps(last_event_time)) & tv < (next_event_time-eps(next_event_time))) ...
+            next_event_time];
         str=sprintf('ode_event: integrating from %f to %f', last_event_time, next_event_time);
         disp(str);
         % uncomment the following 2 lines to debug integration vector
@@ -276,7 +287,10 @@ for i = 1:length(events)-1
         event_flags(i) = 1;
         % no need to update event_times
     elseif (next_event_time == 0) % integrate to steady-state?
-        TV = [last_event_time tv(find(tv > last_event_time & tv < timeout)) timeout];
+        TV = [last_event_time ...
+            tv(tv > (last_event_time+eps(last_event_time)) & ...
+            tv < (timeout-eps(timeout))) ...
+            timeout];
         str=sprintf('ode_event: integrating from %f to steady-state (or to timeout at %f)', last_event_time, timeout);
         disp(str);
         
@@ -338,7 +352,7 @@ if strcmp(flag, 'init')
 elseif ~strcmp(flag, 'done')
     y_end = y(:,end); % for speed
     dy = odefun(t(:,end),y_end,varargin{:}) * SS_timescale;
-    dy_threshold = max(SS_RelTol * abs(y_end), SS_AbsTol);
+    dy_threshold = SS_RelTol * max(abs(y_end), SS_AbsTol);
     ss_condition = abs(dy) < dy_threshold;
     if (ss_condition)
         str=sprintf('ode_event: steady-state stopping condition reached at t=%f', t(end));

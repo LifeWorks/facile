@@ -2,6 +2,7 @@ Testing class: NodeList
 Creating node1 object: {
   'Node' => {
               'ID' => -1,
+              'is_extern_flag' => 0,
               'index' => 0,
               'create_reactions_ref' => [],
               'destroy_reactions_ref' => [],
@@ -15,6 +16,7 @@ node count is 1
 Creating node2 object: {
   'Node' => {
               'ID' => -1,
+              'is_extern_flag' => 0,
               'index' => 1,
               'create_reactions_ref' => [],
               'destroy_reactions_ref' => [],
@@ -28,6 +30,7 @@ node count is 2
 Creating node3 object: {
   'Node' => {
               'ID' => -1,
+              'is_extern_flag' => 0,
               'index' => 2,
               'create_reactions_ref' => [],
               'destroy_reactions_ref' => [],

@@ -39,6 +39,7 @@ use base qw();
     my %constraint_expression        :ATTR(get => 'constraint_expression', set => 'constraint_expression');
     my %destroy_reactions_ref_of     :ATTR(get => 'destroy_reactions_ref');
     my %create_reactions_ref_of      :ATTR(get => 'create_reactions_ref');
+    my %is_extern_flag_of            :ATTR(get => 'is_extern_flag', set => 'is_extern_flag', default => 0);
 
     # attribute determines if user wants this node to be plotted
     # (support depends on target output)

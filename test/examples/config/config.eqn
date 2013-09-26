@@ -2,6 +2,7 @@
 
 A + B -> X + Y; f1=1.1
 
+parameter f2 = 100
 
 CONFIG
 
@@ -9,14 +10,26 @@ CONFIG
 t_final = 1.5
 compartment_volume = 2e-15
 
-# Matlab
+# ODE solvers (Matlab, Octave, SciPy)
 t_vector = [t0:0.01:tf]
 matlab_ode_solver = ode45
-matlab_odeset_options = odeset('MaxStep',0.01)
+matlab_solver_options{MaxStep} = 0.01
+matlab_solver_options{RelTol} = 1e-3
+
+octave_ode_solver = lsode
+octave_solver_options{lsode}{maximum step size} = 0.001
+
+scipy_ode_solver = odeint
+scipy_solver_options{odeint}{atol} = 1e-12
+scipy_solver_options{odeint}{rtol} = 1e-6
+
 ode_event_times = 0.2 0.4 0.6
 SS_timescale = 10
 SS_RelTol = 1e-4
 SS_AbsTol = 1e-6
+
+external_parameters = f1 f2
+external_initial_values = X Y
 
 # EasyStoch
 easystoch_sample_times{f1} = 0.3 0.4 0.7

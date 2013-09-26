@@ -1,0 +1,37 @@
+Facile version 0.53
+Copyright (c) 2003-2012, Ollivier, Siso, Swain et al.
+
+The constrained variables are:
+
+d = " - (-1)*e + d_tot", d_tot = 0
+
+c = " - (-1)*e + c_tot", c_tot = 0
+
+b = " - (2)*e + b_tot", b_tot = 100
+
+Warning: No bifurcation parameter specified in BIFURC_PARAM.
+Warning: Defining all non-verbatim rates/moieties as bifurcation parameters.
+Warning: AUTO may not like this...
+
+Note: input file for AUTO is test/examples/moiety_repeated_velocity/moiety_repeated_velocity.c
+Facile done.
+
+Facile version 0.53
+Copyright (c) 2003-2012, Ollivier, Siso, Swain et al.
+Note: input file for Mathematica is test/examples/moiety_repeated_velocity/moiety_repeated_velocity.ma
+(* initial values *)
+ib = 100;
+ic = 0;
+id = 0;
+ie = 0;
+
+(* constants *)
+f1 = 1;
+
+(* ode for independent species *)
+dbdt = - f1 b - f1 b ;
+dcdt = + f1 b ;
+dddt = + f1 b ;
+dedt = + f1 b ;
+Facile done.
+

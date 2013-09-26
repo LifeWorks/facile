@@ -1,0 +1,51 @@
+
+                                   < M A T L A B (R) >
+                         Copyright 1984-2009 The MathWorks, Inc.
+                       Version 7.9.0.529 (R2009b) 32-bit (glnx86)
+                                     August 12, 2009
+
+ 
+  To get started, type one of these: helpwin, helpdesk, or demo.
+  For product information, visit www.mathworks.com.
+ 
+ode_event: integrating from 0.000000 to steady-state (or to timeout at 50.000000)
+ode_event: steady-state stopping condition reached at t=19.910000
+ode_event: integrated from 0.000000 to 19.910000
+ode_event: integrating from 19.910000 to 50.000000
+ode_event: integrating from 50.000000 to steady-state (or to timeout at 300.000000)
+ode_event: steady-state stopping condition reached at t=64.000000
+ode_event: integrated from 50.000000 to 64.000000
+ode_event: integrating from 64.000000 to 154.000000
+ode_event: integrating from 154.000000 to steady-state (or to timeout at 300.000000)
+ode_event: steady-state stopping condition reached at t=158.650000
+ode_event: integrated from 154.000000 to 158.650000
+ode_event: integrating from 158.650000 to 300.000000
+ode_event: integrating from 300.000000 to steady-state (or to timeout at 1000.000000)
+ode_event: steady-state stopping condition reached at t=306.600000
+ode_event: integrated from 300.000000 to 306.600000
+Facile driver script done
+Sample values of outputs for future reference:
+X= 
+    4.0000    2.4505    0.0740    0.0000
+
+Y= 
+    5.0000    0.9924    0.0000    0.9091
+
+Z= 
+    2.0000    0.6805    0.0003    1.8182
+
+Value of X,Y and Z at event times
+
+event_times =
+
+   19.9100   50.0000   64.0000  154.0000  158.6500  300.0000  306.6000
+
+X= 
+    0.0000   -0.0000    2.0000   -0.0000   -0.0000    0.0000    0.0000
+
+Y= 
+    0.0000    0.0000   -0.0000   -0.0000    0.9091    0.9091    0.9091
+
+Z= 
+    0.0000    0.0000   -0.0000   -0.0000   -0.0000   -0.0000    1.8182
+

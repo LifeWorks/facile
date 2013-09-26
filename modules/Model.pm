@@ -35,6 +35,8 @@ use base qw();
     # import Model class methods from these packages
     use Parser;
     use Matlab;
+    use SciPy;
+    use SunDials;
     use EasyStoch;
     use Mathematica;
     use Maple;
@@ -91,24 +93,42 @@ use base qw();
 	# volume of simulation compartment
 	$config_ref->{compartment_volume} = "NOT_SPECIFIED";
 
-	# Matlab specific
+	# Matlab/Octave/SciPy specific
 	# ---------------
 	# string giving list of sampling times of ODE state vector
 	$config_ref->{tv}="[t0 tf]";
 	# dydt function passed to ode solver will output progress ticks
 	$config_ref->{tk} = -1;
 	# matlab ode solver to use
-	$config_ref->{solver} = "ode23s";
-	# matlab options to set using odeset
-	$config_ref->{solver_options} = "odeset()";
+	$config_ref->{matlab_ode_solver} = "ode23s";
+	# matlab solver options
+	$config_ref->{matlab_solver_options} = {};
+
+	# Default Octave ode solver to use
+	$config_ref->{octave_ode_solver} = "lsode";
+	# octave solver options
+	$config_ref->{octave_solver_options} = {};
+
+	# Default SciPy ode solver to use
+	$config_ref->{scipy_ode_solver} = "ode.vode";
+	# SciPy solver options
+	$config_ref->{scipy_solver_options} = {};
+
+	# Default C++ ode solver to use
+	$config_ref->{cpp_ode_solver} = "cvode";
+	# SciPy solver options
+	$config_ref->{cpp_solver_options} = {};
+
 	# (ode_event.m) list of times where rate params change discontinuously
 	$config_ref->{ode_event_times} = undef;
+
 	# timescale of N+1 integration intervals for steady-state check
-	$config_ref->{SS_timescale} = "";
+	$config_ref->{SS_timescale} = 1.0;
 	# tolerance for steady-state check in each integration interval
-	$config_ref->{SS_RelTol} = "";
-	$config_ref->{SS_AbsTol} = "";
-	# flag indicating that probes should be plotted in Matlab
+	$config_ref->{SS_RelTol} = 1e-3;
+	$config_ref->{SS_AbsTol} = 1e-6;
+
+	# flag indicating that probes should be plotted in Matlab/Octave/SciPy
 	$config_ref->{plot_flag} = 0;
 
 	# EasyStoch specific
@@ -122,6 +142,10 @@ use base qw();
 	# ------------
 	# xpp configuration commands @[...]
 	$config_ref->{xpp_config} = [];
+
+	# command-line args
+	# ------------
+	$config_ref->{opt_ref} = {};
     }
 
     #--------------------------------------------------------------------------------------

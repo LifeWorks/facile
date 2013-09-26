@@ -1,0 +1,54 @@
+Warning: line does not appear to be an equation -- AUTO_PARAM
+the stoichiometry matrix is:
+  0  0  0  0  0  0  0  0  1
+  0  0  0  0  1  0  0 -1  0
+  0  1 -1  0  0  0  0  0  0
+ -1 -1  0  0  0  0  1  1  1
+  0  0  0  0 -1  1  0  0  0
+  1  1  0  0  0  0 -1 -1 -2
+  0  0  1 -1 -1  0  0  0  0
+  0  0  0  0  1 -1  0  0  0
+  0  0  1  1  0 -1  0  0  0
+  1 -1  0  0  0  0  0  0  0
+  0  0  0  0  0  1 -1  0  0
+
+
+Matlab kernel:
+  1  0  0  1  0  1  0  0  0  0  0
+  0  1  2  2  0  1  1  0  1  1  1
+  0  0  0  0  1  0  0  1  0  0  0
+
+
+Perl kernel (using this kernel):
+  1  0  0  1  0  1  0  0  0  0  0
+  0  1  2  2  0  1  1  0  1  1  1
+  0  0  0  0  1  0  0  1  0  0  0
+
+
+Check: kernel*stoichiometry should be [0]
+  0  0  0  0  0  0  0  0  0
+  0  0  0  0  0  0  0  0  0
+  0  0  0  0  0  0  0  0  0
+
+
+
+
+The constrained variables are:
+
+i = " - g - h + i_tot", i_tot = 4
+
+f = " - (2)*b - (2)*g - h - c - d - a - e + f_tot", f_tot = 10
+
+k = " - j + k_tot", k_tot = 0
+
+eqe = + v5 - v6 ;
+eqa = + v1 - v2 ;
+eqd = + v3 + v4 - v5 ;
+eqj = + v7 - v5 ;
+eqc = + v3 - v4 - v7 ;
+eqh = + v1 + v2 - v6 - v8 - v9 - v9 ;
+eqk = + v5 - v7 ;
+eqg = + v6 + v8 + v9 - v1 - v2 ;
+eqb = + v2 - v3 ;
+eqf = + v7 - v8 ;
+eqi = + v9 ;

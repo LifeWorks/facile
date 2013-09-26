@@ -62,8 +62,10 @@ use base qw();
     my %dimension_of          :ATTR(get => 'dimension', set => 'dimension', init_arg => 'dimension');
     my %type_of               :ATTR(get => 'type', set=> 'type', init_arg => 'type');
     my %is_expression_flag_of :ATTR(get => 'is_expression_flag', init_arg => 'is_expression_flag');  # constant or expression?
+    my %is_dynamic_flag_of    :ATTR(get => 'is_dynamic_flag', default => 0);  # constant or expression?
     my %source_line_of        :ATTR(get => 'source_line', init_arg => 'source_line');
     my %is_bifurcation_parameter_flag_of :ATTR(get => 'is_bifurcation_parameter_flag', default => 0);
+    my %is_extern_flag_of        :ATTR(get => 'is_extern_flag', set => 'is_extern_flag', default => 0);
 
     # attribute determines if user wants this variable to be plotted
     # (support depends on target output)
@@ -246,13 +248,44 @@ use base qw();
 	}
 	return sort keys %var_names;
     }
+
+    sub compute_is_dynamic_flag {
+	my $self = shift;
+	my $variable_list_ref = shift;
+
+	my $is_dynamic_flag = 0;
+
+	if ($is_expression_flag_of{ident $self}) {
+	    # depends on time?
+	    if (($value_of{ident $self} =~ /(?<!\w)t(?!\w)/) ||
+		($value_of{ident $self} =~ /(?<!\w)event_flags(?!\w)/) ||
+		($value_of{ident $self} =~ /(?<!\w)event_times(?!\w)/)) {
+		$is_dynamic_flag = 1;
+	    }
+
+	    if (!$is_dynamic_flag) {
+		# check if dynamic indirectly
+		my @dep_vars = $self->get_dependent_vars($variable_list_ref);
+		@dep_vars = map {$variable_list_ref->lookup_by_name($_)} @dep_vars;
+		foreach my $dep_var_ref (@dep_vars) {
+		    if ($dep_var_ref->get_is_dynamic_flag()) {
+			$is_dynamic_flag = 1;
+			last;
+		    }
+		}
+	    }
+	}
+
+	$is_dynamic_flag_of{ident $self} = $is_dynamic_flag;
+    }
+
 }
 
 # TESTING
 sub run_testcases {
     print "Testing class: Variable\n";
     
-    print "Creating var1 object: ";
+    print "Testing Variable object creation: ";
     my $var1_ref = Variable->new({
        name => "f1",
        index => 0,
@@ -260,57 +293,68 @@ sub run_testcases {
        type => "rate",
        dimension => 2,
        is_expression_flag => 0,
+       is_dynamic_flag => 0,
        source_line => "f1=1.0",
       });
     print $var1_ref->_DUMP();
-    print "Done testing class: Variable\n";
 
-    # testing of eval_expression() and square()
     print "\nTesting square() and eval_expression():\n";
     my ($t, $f, $valid_f);
 
-    $var1_ref->set_value("0.5*(square(2*pi*t,30)+1)"); 
-    $t=10.3; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    my $var2_ref = Variable->new({
+       name => "f2",
+       index => 1,
+       value => "0.5*(square(2*pi*t,30)+1)",
+       type => "rate",
+       dimension => 2,
+       is_expression_flag => 1,
+       is_dynamic_flag => 0,
+       source_line => "f2=f1*0.5*(square(2*pi*t,30)+1)",
+      });
+    print $var2_ref->_DUMP();
+
+    $t=10.3; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
     $valid_f = 0; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
 
-    $var1_ref->set_value("0.5*(square(2.0*pi*(t-10.0)/40.0, 1.25)+1)");
+    $var2_ref->set_value("0.5*(square(2.0*pi*(t-10.0)/40.0, 1.25)+1)");
 
-    $t=-45; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    $t=-45; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
     $valid_f = 0; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
-    $t=9.99; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    $t=9.99; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
     $valid_f = 0; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
-    $t=10; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    $t=10; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
     $valid_f = 1; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
-    $t=10.499; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    $t=10.499; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
     $valid_f = 1; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
-    $t=10.5; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    $t=10.5; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
     $valid_f = 0; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
-    $t=10.51; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
-    $valid_f = 0; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
-
-    $t=49.99; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
-    $valid_f = 0; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
-    $t=50; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
-    $valid_f = 1; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
-    $t=50.499; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
-    $valid_f = 1; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
-    $t=50.5; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
-    $valid_f = 0; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
-    $t=50.51; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    $t=10.51; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
     $valid_f = 0; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
 
-    $t=169.99; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    $t=49.99; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
     $valid_f = 0; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
-    $t=170; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    $t=50; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
     $valid_f = 1; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
-    $t=170.499; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    $t=50.499; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
     $valid_f = 1; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
-    $t=170.5; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    $t=50.5; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
     $valid_f = 0; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
-    $t=170.51; $f=$var1_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    $t=50.51; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    $valid_f = 0; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
+
+    $t=169.99; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    $valid_f = 0; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
+    $t=170; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    $valid_f = 1; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
+    $t=170.499; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    $valid_f = 1; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
+    $t=170.5; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
+    $valid_f = 0; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
+    $t=170.51; $f=$var2_ref->eval_expression($t); print "t=$t, f(t)=".$f."\n";
     $valid_f = 0; print "ERROR: f(t) should be $valid_f not $f\n" if ($f != $valid_f);
     print "Done resting square() and eval_expression().\n";
 
+    print "Done testing class: Variable\n";
 }
 
 # Package BEGIN must return true value

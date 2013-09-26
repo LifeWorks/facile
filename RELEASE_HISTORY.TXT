@@ -10,6 +10,34 @@
 Date	    Tag			Preparer	Notes
 ----        ---			--------	-------
 
+2013/09/25  RELEASE_0V53a	ollivier	Add support for Sundials/CVODE solver. Generate
+						associated C++ code and Octave wrapper.
+						New C++/CVODE solver combination.
+						Fix bug in factorization module.
+						Add support for ode_event_times when output
+						target is Octave.
+
+2012/09/10  RELEASE_0V52	ollivier	New config variables external_initial_values,
+						and external_parameters, both enabled by --extern.
+						More efficient dydt calculation through factoring
+						out common terms. Needs --fast_dydt switch to enable.
+						Fix numerical problem when extracting sub-intervals
+						out of TV vector based on event times.
+2012/09/07  RELEASE_0V51	ollivier	Added --extern switch, deprecated --noparams.
+						Added ability to detect which parameter expressions
+						are time dependent (dynamic) vs constant. Those that
+						are constant are calculated once in driver file. Only
+						dynamic parameters are re-calculated in dydt function
+						(Matlab/Octave only). 
+
+2012/09/05  RELEASE_0V50	ollivier	Added partial support for Octave and SciPy.
+						Deprecated config variable matlab_odeset_options,
+						replaced by matlab_solver_options.
+						Improved plot commands issued in driver files.
+						In driver scripts, pass rate constants to dydt function
+						using a global variable instead of through function arg.
+						Added --run option.
+
 2012/05/28  RELEASE_0V41	ollivier	Better section headers in generated easystoch simulation.
 						Easystoch input file default name changed to xyz.seqn
 						(from xyz_simulation_input).

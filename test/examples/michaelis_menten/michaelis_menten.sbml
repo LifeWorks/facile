@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbml xmlns="http://www.sbml.org/sbml/level2" level="2" version="1">
+  <model id="example_michaelis_menten">
+    <listOfCompartments>
+      <compartment id="main"/>
+    </listOfCompartments>
+    <listOfSpecies>
+      <species id="E" compartment="main" initialAmount="1e-06"/>
+      <species id="S" compartment="main" initialAmount="0.001"/>
+      <species id="C" compartment="main" initialAmount="0"/>
+      <species id="P" compartment="main" initialAmount="0"/>
+    </listOfSpecies>
+    <listOfReactions>
+      <reaction id="R0" name="E+S -> C; f= 1.5e6">
+        <listOfReactants>
+          <speciesReference species="E"/>
+          <speciesReference species="S"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="C"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> f </ci>
+              <ci> E </ci>
+              <ci> S </ci>
+            </apply>
+          </math>
+          <listOfParameters>
+            <parameter id="f" value="1500000"/>
+          </listOfParameters>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R1" name="C -> E+S ; b= 1e3">
+        <listOfReactants>
+          <speciesReference species="C"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="E"/>
+          <speciesReference species="S"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> b </ci>
+              <ci> C </ci>
+            </apply>
+          </math>
+          <listOfParameters>
+            <parameter id="b" value="1000"/>
+          </listOfParameters>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R2" name="C -> P + E; k= 1e3">
+        <listOfReactants>
+          <speciesReference species="C"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="P"/>
+          <speciesReference species="E"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> k </ci>
+              <ci> C </ci>
+            </apply>
+          </math>
+          <listOfParameters>
+            <parameter id="k" value="1000"/>
+          </listOfParameters>
+        </kineticLaw>
+      </reaction>
+    </listOfReactions>
+  </model>
+</sbml>

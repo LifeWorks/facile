@@ -1,0 +1,6 @@
+Facile version 0.53
+Copyright (c) 2003-2012, Ollivier, Siso, Swain et al.
+Warning: there are no initial conditions specified in this file
+Note: input files for Matlab sims are test/examples/config/config_odes.m, test/examples/config/configDriver.m, test/examples/config/config_s.m, test/examples/config/config_r.m, test/examples/config/config_ode_event.m
+Facile done.
+

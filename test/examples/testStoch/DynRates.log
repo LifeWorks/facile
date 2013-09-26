@@ -1,0 +1,12 @@
+Facile version 0.53
+Copyright (c) 2003-2012, Ollivier, Siso, Swain et al.
+Warning: Low initial (t=0) bimolecular reaction rate rateXY=0
+         --> in reaction: X + Y -> XY; rateXY = 1e6*0.5*fsq
+Warning: (bimolecular interactions should be in units of inverse molar inverse time)
+Warning: Low initial (t=0) bimolecular reaction rate f4=0
+         --> in reaction: A4 + B -> A1 + B; f4=1000*fx2*fsq
+Warning: (bimolecular interactions should be in units of inverse molar inverse time)
+Note: input file for stochastic sims is test/examples/testStoch/DynRates.seqn
+Note: Matlab conversion script for stochastic sims is test/examples/testStoch/DynRates_convert.m
+Facile done.
+

@@ -85,8 +85,13 @@ CONFIG:
 ode_event_times = ~ ~ ~ ~ ~ ~ ~;
 t_final = 50000;
 t_vector = [t0:10.0:tf];
+
 matlab_ode_solver = ode23s;
-matlab_odeset_options = odeset('InitialStep', 1e-8, 'AbsTol', 1e-9, 'RelTol', 1e-3, 'MaxStep', 100.0);
+matlab_solver_options{InitialStep} = 1e-8
+matlab_solver_options{AbsTol} =  1e-9
+matlab_solver_options{RelTol} =  1e-3
+matlab_solver_options{MaxStep} =  100.0
+
 SS_timescale = 100
 
 

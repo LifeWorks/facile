@@ -15,8 +15,8 @@ do_nothing:
 	@echo "To make a tarball, try 'make tarball'"
 	@echo "To run all testcases, try 'make test'"
 
-RELEASE = RELEASE_0V41
-RELEASE_FILES = Makefile *.TXT ode_event.m *.pl modules/*.pm test/modules/*.log test/examples/*/*.eqn test/examples/*/*Script.m
+RELEASE = RELEASE_0V53
+RELEASE_FILES = Makefile *.TXT ode_event.m *.pl modules/*.pm test/examples/*/*.eqn test/examples/*/*Script.m
 TARBALL_DIR = facile_$(RELEASE)
 
 tarball:
@@ -64,6 +64,7 @@ module_tests = \
 	test/modules/Reaction.log \
 	test/modules/ReactionList.log \
 	test/modules/Model.log \
+	test/modules/Expression.log \
 
 general_tests = \
 	test/examples/testMatlab/testMatlab.log \
@@ -110,17 +111,18 @@ test/modules/%.log : FORCE
 
 test/examples/testMatlab/testMatlab.log : FORCE
 	cd $(@D); rm -f testMatlab.log testMatlabScript.log testMatlabDriver.m testMatlab_odes.m testMatlab_r.m testMatlab_s.m testMatlab.ma
-	./facile.pl -M -P -m -t 5.0 -k 1.0 -v "[t0 tf]" -o $(@D)/testMatlab $(@D)/testMatlab.eqn 2>&1 | tee -a $(@D)/testMatlab.log
+	./facile.pl -P -m -t 5.0 -k 1.0 -v "[t0 tf]" -o $(@D)/testMatlab $(@D)/testMatlab.eqn 2>&1 | tee -a $(@D)/testMatlab.log
 	@echo "***********************************************************************************************"
 	@echo "PLEASE VIEW MATLAB RESULTS, THEN TYPE EXIT AND INSPECT DIFFERENCES IN FILE OUTPUT FOR PROBLEMS."
 	@echo "***********************************************************************************************"
-	cd $(@D); matlab -nodesktop -nosplash -logfile testMatlabScript.log -r testMatlabScript 2>&1 | tee -a testMatlab.log
+#	cd $(@D); matlab -nodesktop -nosplash -logfile testMatlabScript.log -r testMatlabScript 2>&1 | tee -a testMatlab.log
 	-bzr diff $(@D)/testMatlab.log
 	-bzr diff $(@D)/testMatlabScript.log
 	-bzr diff $(@D)/testMatlabDriver.m
 	-bzr diff $(@D)/testMatlab_odes.m
 	-bzr diff $(@D)/testMatlab_r.m
 	-bzr diff $(@D)/testMatlab_s.m
+	./facile.pl -M -t 5.0 -k 1.0 -v "[t0 tf]" -o $(@D)/testMatlab $(@D)/testMatlab.eqn 2>&1 | tee -a $(@D)/testMatlab.log
 	-bzr diff $(@D)/testMatlab.ma
 	@echo "If there are no problems, you are now ready to commit source code and log files"
 
@@ -130,7 +132,7 @@ test/examples/testMatlab/testMatlab_misc.log : FORCE
 	@echo "***********************************************************************************************"
 	@echo "PLEASE VIEW MATLAB RESULTS, THEN TYPE EXIT AND INSPECT DIFFERENCES IN FILE OUTPUT FOR PROBLEMS."
 	@echo "***********************************************************************************************"
-	cd $(@D); matlab -nodesktop -nosplash -logfile testMatlab_miscScript.log -r testMatlab_miscScript 2>&1 | tee -a testMatlab_misc.log
+#	cd $(@D); matlab -nodesktop -nosplash -logfile testMatlab_miscScript.log -r testMatlab_miscScript 2>&1 | tee -a testMatlab_misc.log
 	-bzr diff $(@D)/testMatlab_misc.log
 	-bzr diff $(@D)/testMatlab_miscScript.log
 	-bzr diff $(@D)/testMatlab_miscDriver.m
@@ -145,7 +147,7 @@ test/examples/steady_state/%.log : FORCE
 	@echo "***********************************************************************************************"
 	@echo "PLEASE VIEW MATLAB RESULTS, THEN TYPE EXIT AND INSPECT DIFFERENCES IN FILE OUTPUT FOR PROBLEMS."
 	@echo "***********************************************************************************************"
-	cd $(@D); matlab -nodesktop -nosplash -logfile $*Script.log -r $*Script 2>&1 | tee -a $*.log
+#	cd $(@D); matlab -nodesktop -nosplash -logfile $*Script.log -r $*Script 2>&1 | tee -a $*.log
 	-bzr diff $(@D)/$*.log
 	-bzr diff $(@D)/$*Script.log
 	-bzr diff $(@D)/$*Driver.m
@@ -153,35 +155,36 @@ test/examples/steady_state/%.log : FORCE
 	@echo "If there are no problems, you are now ready to commit source code and log files"
 
 test/examples/testStoch/GTPase.log : FORCE
-	cd $(@D); rm -f GTPase.log GTPase_simulation_input GTPase_convert.m
+	cd $(@D); rm -f GTPase.log GTPase.seqn GTPase_convert.m
 	./facile.pl -s -o $(@D)/GTPase $(@D)/GTPase.eqn 2>&1 | tee -a $(@D)/GTPase.log
 	@echo "Please inspect differences in file output for problems."
 	-bzr diff $(@D)/GTPase.log
-	-bzr diff $(@D)/GTPase_simulation_input
+	-bzr diff $(@D)/GTPase.seqn
 	-bzr diff $(@D)/GTPase_convert.m
 	@echo "If there are no problems, you are now ready to commit source code and log files"
 
 test/examples/testStoch/DynRates.log : FORCE
-	cd $(@D); rm -f DynRates.log DynRates_simulation_input DynRates_convert.m
+	cd $(@D); rm -f DynRates.log DynRates.seqn DynRates_convert.m
 	./facile.pl -s -o $(@D)/DynRates $(@D)/DynRates.eqn 2>&1 | tee -a $(@D)/DynRates.log
 	@echo "Please inspect differences in file output for problems."
 	-bzr diff $(@D)/DynRates.log
-	-bzr diff $(@D)/DynRates_simulation_input
+	-bzr diff $(@D)/DynRates.seqn
 	-bzr diff $(@D)/DynRates_convert.m
 	@echo "If there are no problems, you are now ready to commit source code and log files"
 
 test/examples/repression/repression.log : FORCE
-	cd $(@D); rm -f repression.log repression_simulation_input repression_convert.m
+	cd $(@D); rm -f repression.log repression.seqn repression_convert.m
 	./facile.pl -s -o $(@D)/repression $(@D)/repression.eqn 2>&1 | tee -a $(@D)/repression.log
 	@echo "Please inspect differences in file output for problems."
 	-bzr diff $(@D)/repression.log
-	-bzr diff $(@D)/repression_simulation_input
+	-bzr diff $(@D)/repression.seqn
 	-bzr diff $(@D)/repression_convert.m
 	@echo "If there are no problems, you are now ready to commit source code and log files"
 
 test/examples/michaelis_menten/michaelis_menten.log : FORCE
 	cd $(@D); rm -f michaelis_menten.log michaelis_menten.ma
-	./facile.pl -L -M $(@D)/michaelis_menten.eqn 2>&1 | tee -a $(@D)/michaelis_menten.log
+	./facile.pl -L $(@D)/michaelis_menten.eqn 2>&1 | tee -a $(@D)/michaelis_menten.log
+	./facile.pl -M $(@D)/michaelis_menten.eqn 2>&1 | tee -a $(@D)/michaelis_menten.log
 	@echo "***********************************************************************************************"
 	@echo "PLEASE INSPECT DIFFERENCES IN FILE OUTPUT FOR PROBLEMS."
 	@echo "***********************************************************************************************"
@@ -191,23 +194,22 @@ test/examples/michaelis_menten/michaelis_menten.log : FORCE
 	@echo "If there are no problems, you are now ready to commit source code and log files"
 
 test/examples/poisson/poisson.log : FORCE
-	cd $(@D); rm -f poisson.log poisson.ma
-	./facile.pl -M $(@D)/poisson.eqn 2>&1 | tee -a $(@D)/poisson.log
-	./facile.pl -m --split $(@D)/poisson.eqn 2>&1 | tee -a $(@D)/poisson.log
+	cd $(@D); rm -f poisson.log
+	./facile.pl -P --octave --solver=lsode --split --extern --factor $(@D)/poisson.eqn 2>&1 | tee -a $(@D)/poisson.log
+	cd $(@D); octave --interactive --persist poissonScript.m 2>&1 | tee -a poisson.log
 	@echo "***********************************************************************************************"
 	@echo "PLEASE INSPECT DIFFERENCES IN FILE OUTPUT FOR PROBLEMS."
 	@echo "***********************************************************************************************"
 	-bzr diff $(@D)/poisson.log
-	-bzr diff $(@D)/poisson.ma
 	-bzr diff $(@D)/poissonDriver.m
 	-bzr diff $(@D)/poisson_odes.m
-	-bzr diff $(@D)/poisson_S.m
-	-bzr diff $(@D)/poisson_R.m
+	-bzr diff $(@D)/poisson_ivals.m
+	-bzr diff $(@D)/poisson_rates.m
 	@echo "If there are no problems, you are now ready to commit source code and log files"
 
 test/examples/config/config.log : FORCE
 	cd $(@D); rm -f config.log configDriver.m config_odes.m config_ode_event.m config_r.m config_s.m
-	./facile.pl -m $(@D)/config.eqn 2>&1 | tee -a $(@D)/config.log
+	./facile.pl -m $(@D)/config.eqn --extern 2>&1 | tee -a $(@D)/config.log
 	@echo "***********************************************************************************************"
 	@echo "PLEASE INSPECT DIFFERENCES IN FILE OUTPUT FOR PROBLEMS."
 	@echo "***********************************************************************************************"

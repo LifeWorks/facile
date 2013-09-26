@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbml xmlns="http://www.sbml.org/sbml/level2/version4" level="2" version="4">
+  <model id="michaelis_menten">
+    <listOfCompartments>
+      <compartment id="main"/>
+    </listOfCompartments>
+    <listOfSpecies>
+      <species id="E1" compartment="main" initialAmount="1e-06"/>
+      <species id="S" compartment="main" initialAmount="0.001"/>
+      <species id="C" compartment="main" initialAmount="0"/>
+      <species id="P" compartment="main" initialAmount="0"/>
+      <species id="E2" compartment="main" initialAmount="1.5e-06"/>
+    </listOfSpecies>
+    <listOfParameters>
+      <parameter id="mega" value="1000000"/>
+      <parameter id="f1" constant="false"/>
+      <parameter id="b1" value="1000"/>
+      <parameter id="k1" value="1000"/>
+      <parameter id="f2" constant="false"/>
+      <parameter id="b2" constant="false"/>
+      <parameter id="k2" constant="false"/>
+      <parameter id="fd" constant="false"/>
+    </listOfParameters>
+    <listOfRules>
+      <assignmentRule variable="f1">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <cn> 1.5 </cn>
+            <ci> mega </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="f2">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> mega </ci>
+            <ci> E2 </ci>
+            <ci> S </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="b2">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <cn type="e-notation"> 1 <sep/> 3 </cn>
+            <ci> C </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="k2">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <cn type="e-notation"> 1 <sep/> 3 </cn>
+            <ci> C </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="fd">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <plus/>
+            <ci> f1 </ci>
+            <ci> f2 </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+    </listOfRules>
+    <listOfReactions>
+      <reaction id="R0" name="E1+S -&gt; C; f1= 1.5*mega">
+        <listOfReactants>
+          <speciesReference species="E1"/>
+          <speciesReference species="S"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="C"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> f1 </ci>
+              <ci> E1 </ci>
+              <ci> S </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R1" name="C -&gt; E1+S ; b1= 1e3">
+        <listOfReactants>
+          <speciesReference species="C"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="E1"/>
+          <speciesReference species="S"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> b1 </ci>
+              <ci> C </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R2" name="C -&gt; P + E1; k1= 1e3">
+        <listOfReactants>
+          <speciesReference species="C"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="P"/>
+          <speciesReference species="E1"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> k1 </ci>
+              <ci> C </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R3" name="E2+S =&gt; C; f2= mega*E2*S">
+        <listOfReactants>
+          <speciesReference species="E2"/>
+          <speciesReference species="S"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="C"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <ci> f2 </ci>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R4" name="C =&gt; E2+S ; b2= 1e3*C">
+        <listOfReactants>
+          <speciesReference species="C"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="E2"/>
+          <speciesReference species="S"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <ci> b2 </ci>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R5" name="C =&gt; P + E2; k2= 1e3*C">
+        <listOfReactants>
+          <speciesReference species="C"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="P"/>
+          <speciesReference species="E2"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <ci> k2 </ci>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R6" name="P -&gt; null; fd=f1+f2">
+        <listOfReactants>
+          <speciesReference species="P"/>
+        </listOfReactants>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> fd </ci>
+              <ci> P </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+    </listOfReactions>
+  </model>
+</sbml>

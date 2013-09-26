@@ -1,8 +1,60 @@
 # poisson process
 
-D -> A + D	;k= 10 
+D -> A + D	;k= t/4*10*(t>=4 && t<8)
 A -> null	;d= 1
 
 INIT:
+
 D= 1
+
+CONFIG:
+
+t_final = 10
+#t_vector = [t0 tf]
+t_vector = [t0:0.1:tf]
+
+ode_event_times = 4 8
+
+matlab_ode_solver = ode15s
+matlab_solver_options{MaxStep} = 10.0
+
+octave_ode_solver = lsode
+octave_solver_options{lsode}{maximum step size} = 10.0
+
+octave_ode_solver = ode5r
+octave_solver_options{ode5r}{RelTol} = 1e-6
+octave_solver_options{ode5r}{AbsTol} = 1e-6
+
+octave_ode_solver = cvode
+octave_solver_options{cvode}{reltol} = 1.0e-6
+octave_solver_options{cvode}{abstol} = 1.0e-9
+octave_solver_options{cvode}{CVodeSetInitStep} = -1
+octave_solver_options{cvode}{CVodeSetMinStep} = -1
+octave_solver_options{cvode}{CVodeSetMaxStep} = -1
+
+scipy_ode_solver = odeint
+scipy_solver_options{odeint}{atol} = 1e-12
+scipy_solver_options{odeint}{rtol} = 1e-6
+
+scipy_ode_solver = ode.vode
+scipy_solver_options{ode.vode}{method} = 'bdf'
+scipy_solver_options{ode.vode}{order} = 5
+scipy_solver_options{ode.vode}{nsteps} = 100000
+scipy_solver_options{ode.vode}{atol} = 1e-12
+scipy_solver_options{ode.vode}{rtol} = 1e-6
+scipy_solver_options{ode.vode}{first_step} = 0.0
+scipy_solver_options{ode.vode}{max_step} = 1.0
+
+cpp_ode_solver = cvode
+cpp_solver_options{cvode}{reltol} = 1.0e-6
+cpp_solver_options{cvode}{abstol} = 1.0e-9
+cpp_solver_options{cvode}{CVodeSetInitStep} = -1
+cpp_solver_options{cvode}{CVodeSetMinStep} = -1
+#cpp_solver_options{cvode}{CVodeSetMaxStep} = -1
+
+external_parameters = d
+
+PROBE:
+
+probe A
 

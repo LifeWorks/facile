@@ -30,6 +30,9 @@ require Exporter;
 	     export_matlab_files
 	    );
 
+use Globals;
+use Expression;
+
 #######################################################################################
 # INSTANCE METHODS
 #######################################################################################
@@ -44,30 +47,42 @@ sub export_matlab_files {
     my %args = (
 	output_file_prefix => undef,
 	split_flag => 0,
+	extern_flag => 0,
+	jacobian_flag => 0,
+	factor_flag => 0,
+	octave_output => 0,
 	@_,
        );
 
     my $output_file_prefix = $args{output_file_prefix};
     my $split_flag = $args{split_flag};
+    my $extern_flag = $args{extern_flag};
+    my $jacobian_flag = $args{jacobian_flag};
+    my $factor_flag = $args{factor_flag};
+    my $octave_output = $args{octave_output} ? 1 : 0;
+    my $matlab_output = $args{octave_output} ? 0 : 1;
 
     my $node_list_ref = $self->get_node_list();
     my $variable_list_ref = $self->get_variable_list();
 
-    my $ode_file_contents;			# ode definition
     my $driver_file_contents;			# ode driver (main function)
+    my %ode_file_contents;			# ode definition
+    my $jac_file_contents;                      # jacobian definition
     my $species_index_mapper_file_contents;     # species index mapping function
     my $rate_index_mapper_file_contents;        # rate index mapping function
     my $IC_file_contents = "";                  # species initial conditions file
-    my $R_file_contents = "";                   # rate constants file
+    my $rates_file_contents = "";                   # rate constants file
 
-    # get configuration vars affecting Matlab output
+    # get configuration vars affecting output
     my $config_ref = $self->get_config_ref();
+
     my $compartment_volume = $config_ref->{compartment_volume};
     my $tf = $config_ref->{tf};
     my $tv = $config_ref->{tv};
     my $tk = $config_ref->{tk};
-    my $solver = $config_ref->{solver};
-    my $solver_options = $config_ref->{solver_options};
+    my $solver = $octave_output ? $config_ref->{octave_ode_solver} : $config_ref->{matlab_ode_solver};
+    my $solver_options = $octave_output ? $config_ref->{octave_solver_options}{$solver} :
+      $config_ref->{matlab_solver_options}{$solver};
     my $ode_event_times = $config_ref->{ode_event_times};
     my $SS_timescale = $config_ref->{SS_timescale};
     my $SS_RelTol = $config_ref->{SS_RelTol};
@@ -78,138 +93,57 @@ sub export_matlab_files {
     my @free_nodes = $node_list_ref->get_ordered_free_node_list();
     my @free_node_names = map ($_->get_name(), @free_nodes);
     my @variables = $variable_list_ref->get_list();
+
     my @constant_rate_params = grep (($_->get_type() =~ /^(rate)|(other)$/ &&
 				      $_->get_is_expression_flag() == 0), @variables);
     my @constant_rate_param_names = map($_->get_name(), @constant_rate_params);
+
+    my @constant_rate_expressions = grep (($_->get_type() =~ /^(rate)|(other)$/ &&
+					   $_->get_is_expression_flag() == 1 &&
+					   $_->get_is_dynamic_flag() == 0), @variables);
+    my @constant_rate_expression_names = map($_->get_name(), @constant_rate_expressions);
+
+    my @dynamic_rate_expressions = grep ($_->get_type() =~ /^(rate)|(other)$/ &&
+				 $_->get_is_dynamic_flag() == 1, @variables);
+
+    my @ode_rate_constants = (@constant_rate_params,@constant_rate_expressions);
+    my @ode_rate_constants_names = map($_->get_name(), @ode_rate_constants);
+
     my @moiety_totals = grep ($_->get_type() eq "moiety_total", @variables);
     my @constrained_node_expressions = grep ($_->get_type() eq "constrained_node_expression",
 					     @variables);
-    my @rate_expressions = grep ($_->get_type() =~ /^(rate)|(other)$/ &&
-				 $_->get_is_expression_flag() == 1, @variables);
-
-    #********************************************************#
-    # generate ode definition                                #
-    #********************************************************#
-    # ODE function
-    # default
-    $ode_file_contents .= "function dydt = ".$output_file_prefix."_odes(t, y, rateconstants)\n\n";
-    $ode_file_contents .= "global event_flags;\nglobal event_times\n\n" if defined $ode_event_times;
-
-    # Clock tick
-    if ($tk != -1) {
-	$ode_file_contents .= "persistent last_tick\n";
-	$ode_file_contents .= "\n";
-	$ode_file_contents .= "if (isempty(last_tick))\n";
-	$ode_file_contents .= "  last_tick = 0;\n";
-	$ode_file_contents .= "  tic;\n";
-	$ode_file_contents .= "end\n";
-	$ode_file_contents .= "\n";
-	$ode_file_contents .= "if (t - last_tick > $tk)\n";
-	$ode_file_contents .= "  str = sprintf('sim time is t=%f, elapsed time=%f', t, toc);\n";
-	$ode_file_contents .= "  disp (str)\n";
-	$ode_file_contents .= "  last_tick = t;\n";
-	$ode_file_contents .= "end\n";
-	$ode_file_contents .= "\n";
-    }
-	
-    # map state vector to free nodes
-    $ode_file_contents .= "% state vector to node mapping\n" if (@constant_rate_params);
-    for (my $j = 0; $j < @free_nodes; $j++) {
-	my $node_ref = $free_nodes[$j];
-	my $node_name = $node_ref->get_name();
-	$ode_file_contents .= "$node_name = y(".($j+1).");\n";
-    }	
-    $ode_file_contents .= "\n";
-
-    # ordinary rate constants, e.g. binary forward rate of kf1=1e6 (M^-1 s^-1)
-    $ode_file_contents .= "% constants\n" if (@constant_rate_params);
-    for (my $i = 0; $i < @constant_rate_params; $i++) {
-	my $variable_ref = $constant_rate_params[$i];
-	my $variable_name = $variable_ref->get_name();
-	my $variable_value = $variable_ref->get_value();
-	my $is_expression_flag = $variable_ref->get_is_expression_flag();
-	$ode_file_contents .= "$variable_name = rateconstants(".($i+1).");\n";
-    }
-    $ode_file_contents .= "\n";
-
-    # moiety totals, e.g. E_moiety = 123 (mol/L)
-    $ode_file_contents .= "% moiety totals\n" if (@moiety_totals);
-    foreach my $variable_ref (@moiety_totals) {
-	my $variable_index = $variable_ref->get_index();
-	my $variable_name = $variable_ref->get_name();
-	my $variable_value = $variable_ref->get_value();
-	my $is_expression_flag = $variable_ref->get_is_expression_flag();
-	$ode_file_contents .= "$variable_name = $variable_value;\n";
-    }
-    $ode_file_contents .= "\n";
-
-    # contrained node expressions, e.g. E = C - E_moiety
-    $ode_file_contents .= "% dependent species\n" if (@constrained_node_expressions);
-    foreach my $variable_ref (@constrained_node_expressions) {
-	my $variable_index = $variable_ref->get_index();
-	my $variable_name = $variable_ref->get_name();
-	my $variable_value = $variable_ref->get_value();
-	my $is_expression_flag = $variable_ref->get_is_expression_flag();
-	$ode_file_contents .= "$variable_name = $variable_value;\n";
-    }
-    $ode_file_contents .= "\n";
-
-    # rate expressions
-    $ode_file_contents .= "% expressions\n" if (@rate_expressions);
-    foreach my $variable_ref (@rate_expressions) {
-	my $variable_index = $variable_ref->get_index();
-	my $variable_name = $variable_ref->get_name();
-	my $variable_value = $variable_ref->get_value();
-	my $is_expression_flag = $variable_ref->get_is_expression_flag();
-	$ode_file_contents .= "$variable_name = $variable_value;\n";
-    }
-    $ode_file_contents .= "\n";
-
-    # print out differential equations for the free nodes
-    $ode_file_contents .= "% differential equations for independent species\n";
-    for (my $j = 0; $j < @free_nodes; $j++) {
-	my $node_ref = $free_nodes[$j];
-	my $node_name = $node_ref->get_name();
-
-	my $ode_rhs;
-
-	# print positive terms
-	my @create_reactions = $node_ref->get_create_reactions();
-	foreach my $reaction_ref (@create_reactions) {
-	    my $velocity = $reaction_ref->get_velocity();
-	    $ode_rhs .= "+ $velocity ";
-	}
-	# print negative terms
-	my @destroy_reactions = $node_ref->get_destroy_reactions();
-	foreach my $reaction_ref (@destroy_reactions) {
-	    my $velocity = $reaction_ref->get_velocity();
-	    $ode_rhs .= "- $velocity ";
-	}
-	if (defined $ode_rhs) {
-	    $ode_file_contents .= "dydt(".($j+1).")= $ode_rhs;\n";
-	} else {
-	    $ode_file_contents .= "dydt(".($j+1).")= 0;\n";
-	}
-    }
-    $ode_file_contents .= "dydt = dydt(:);\n\n";
 
     #********************************************************#
     # generate ode driver                                    #
     #********************************************************#	
+    $driver_file_contents .= "% File generated by Facile version $VERSION\n%\n";
+    $driver_file_contents .= "tic;\n";
+    $driver_file_contents .= "global ode_tot_cputime;\n";
+    $driver_file_contents .= "global ode_num_calls;\n";
+    $driver_file_contents .= "ode_tot_cputime = 0.0;\n";
+    $driver_file_contents .= "ode_num_calls = 0;\n";
+    if ($jacobian_flag) {
+	$driver_file_contents .= "global jac_tot_cputime;\n";
+	$driver_file_contents .= "global jac_num_calls;\n";
+	$driver_file_contents .= "jac_tot_cputime = 0.0;\n";
+	$driver_file_contents .= "jac_num_calls = 0;\n";
+    }
+    $driver_file_contents .= "\n";
 
     # print initial values
     $IC_file_contents .= "% initial values (free nodes only)\n";
     foreach my $node_ref (@free_nodes) {
 	my $node_name = $node_ref->get_name();
 	my $initial_value = $node_ref->get_initial_value_in_molarity($compartment_volume);
-	$IC_file_contents .= "$node_name = $initial_value;\n";
+	my $extern = $extern_flag && $node_ref->get_is_extern_flag() ? "%" : ""; # comment-out IC if external
+	$IC_file_contents .= "$extern$node_name = $initial_value;\n";
     }
 
     # vectorize initial values, printing species in lines of length $linelength
     my $length = @free_node_names;
     my $linelength = 8;
     my $no_lines = int($length/$linelength);
-    $IC_file_contents .= "ivalues = [";
+    $IC_file_contents .= "if exist('ivalues') == 0\nivalues = [";
     if ($no_lines == 0) {
 	$IC_file_contents .= "@free_node_names";
     } else {
@@ -223,50 +157,50 @@ sub export_matlab_files {
 	$end = $length - 1;
 	$IC_file_contents .= "@free_node_names[$start...$end]";
     }
-    $IC_file_contents .= "];\n\n";
+    $IC_file_contents .= "];\nend\n";
 
     # if splitting, source the IC file, else incorporate directly in driver
     if (!$split_flag) {
 	$driver_file_contents .= $IC_file_contents;
     } else {
 	$driver_file_contents .= "% initial values (free nodes only)\n";
-	$driver_file_contents .= "${output_file_prefix}_S;\n\n";
+	$driver_file_contents .= "${output_file_prefix}_ivals;\n\n";
     }
 
-    # rate constants 
-    $R_file_contents .= "% rate constants\n";
-    foreach my $variable_ref (@constant_rate_params) {
+    # rate constants
+    $rates_file_contents .= "% rate constants and constant expressions\n";
+    foreach my $variable_ref (@ode_rate_constants) {
 	my $variable_name = $variable_ref->get_name();
 	my $variable_value = $variable_ref->get_value();
-	my $variable_dimension = $variable_ref->get_dimension();
-	my $is_expression_flag = $variable_ref->get_is_expression_flag();
-	$R_file_contents .= "$variable_name= $variable_value;\n";
+	my $extern = $extern_flag && $variable_ref->get_is_extern_flag() ? "%" : ""; # comment-out param if external
+	$rates_file_contents .= $extern.sprintf("%-16s = $variable_value;\n","$variable_name");
     }
-    $R_file_contents .= "rates= [";
-    $length = @constant_rate_params;
+    $rates_file_contents .= "global ode_rate_constants;\n";
+    $rates_file_contents .= "ode_rate_constants = [";
+    $length = @ode_rate_constants;
     $linelength = 12;
     $no_lines = int($length/$linelength);
     if ($no_lines == 0) {
-	$R_file_contents .= "@constant_rate_param_names";
+	$rates_file_contents .= "@ode_rate_constants_names";
     } else {
 	my ($start, $end);
 	for (my $j = 0; $j < $no_lines; $j++) {
 	    $start= $j * $linelength;
 	    $end= $start + $linelength - 1;
-	    $R_file_contents .= "@constant_rate_param_names[$start...$end] ...\n\t";
+	    $rates_file_contents .= "@ode_rate_constants_names[$start...$end] ...\n\t";
 	}
 	$start= $end+1;
 	$end= $length-1;
-	$R_file_contents .= "@constant_rate_param_names[$start...$end]";
+	$rates_file_contents .= "@ode_rate_constants_names[$start...$end]";
     }
-    $R_file_contents .= "];\n\n";
+    $rates_file_contents .= "];\n\n";
 
     # if splitting, source the IC file, else incorporate directly in driver
     if (!$split_flag) {
-	$driver_file_contents .= $R_file_contents;
+	$driver_file_contents .= $rates_file_contents;
     } else {
-	$driver_file_contents .= "% rate constants\n";
-	$driver_file_contents .= "${output_file_prefix}_R;\n\n";
+	$driver_file_contents .= "% rate constants and constant expressions\n";
+	$driver_file_contents .= "${output_file_prefix}_rates;\n\n";
     }
 
     # call ODE function
@@ -274,20 +208,85 @@ sub export_matlab_files {
     $driver_file_contents .= "t0= 0;\n";
     $driver_file_contents .= "tf= $tf;\n";
     $driver_file_contents .= "\n% call solver routine \n";
-    $driver_file_contents .= "global event_times;\n" if (defined $ode_event_times);
-    $driver_file_contents .= "global event_flags;\n" if (defined $ode_event_times);
-    if (defined $ode_event_times) {
-	my $ode_events = $ode_event_times;
-	# translate ~ to '0' or '-' to conform with ode_event.m convention
-	$ode_events =~ s/~\s+/0 /g;   # tilde followed by whitespace becomes 0
-	$ode_events =~ s/~$/0/g;      # tilde as last character becomes 0
-	$ode_events =~ s/~/-/g;       # any other tilde becomes a '-'
-	$driver_file_contents .= ("[t, y, intervals]= ${output_file_prefix}_ode_event(".
-			       "\@${solver}, \@${output_file_prefix}_odes, $tv, ivalues, $solver_options, ".
-				  "[$ode_events], [$SS_timescale], [$SS_RelTol], [$SS_AbsTol], rates);\n\n");
+    if ($matlab_output) {
+	$driver_file_contents .= "global event_times;\n" if (defined $ode_event_times);
+	$driver_file_contents .= "global event_flags;\n" if (defined $ode_event_times);
+
+	my @solver_options = ();
+	foreach my $key (keys %$solver_options) {
+	    push @solver_options, "'$key'";
+	    push @solver_options, "$solver_options->{$key}";
+	}
+	if ($jacobian_flag) {
+	    push @solver_options, ("'Jacobian'", "\@${output_file_prefix}_jac");
+	}
+	my $solver_options_string = "odeset(".join(",",@solver_options).")";
+
+	if (defined $ode_event_times) {
+	    # translate ~ to '0' to conform with ode_event.m convention
+	    my @ode_events = split(/\s*[, ]\s*/,$ode_event_times);
+	    @ode_events = map {$_ eq '~' ? 0.0 : $_} @ode_events;
+	    $driver_file_contents .= "ode_events = [@ode_events];\n";
+	    $driver_file_contents .= ("[t, y, intervals]= ${output_file_prefix}_ode_event(".
+				      "\@${solver}, \@${output_file_prefix}_odes, $tv, ivalues, $solver_options_string, ".
+				      "ode_events, [$SS_timescale], [$SS_RelTol], [$SS_AbsTol]);\n\n");
+	} else {
+	    $driver_file_contents .= "[t, y]= $solver(\@${output_file_prefix}_odes, $tv, ivalues, $solver_options_string);\n\n";
+	}
     } else {
-	$driver_file_contents .= "[t, y]= $solver(\@${output_file_prefix}_odes, $tv, ivalues, $solver_options, rates);\n\n";
+	# octave output
+	if ($solver eq "cvode") {
+          $driver_file_contents .= "odeopt_reltol = ".(defined $solver_options->{reltol} ? $solver_options->{reltol} : "-1").";\n";
+          $driver_file_contents .= "odeopt_abstol = ".(defined $solver_options->{abstol} ? $solver_options->{abstol} : "-1").";\n";
+          $driver_file_contents .= "odeopt_CVodeSetInitStep = ".(defined $solver_options->{CVodeSetInitStep} ? $solver_options->{CVodeSetInitStep} : "-1").";\n";
+          $driver_file_contents .= "odeopt_CVodeSetMinStep = ".(defined $solver_options->{CVodeSetMinStep} ? $solver_options->{CVodeSetMinStep} : "-1").";\n";
+	  $driver_file_contents .= "odeopt_CVodeSetMaxStep = ".(defined $solver_options->{CVodeSetMaxStep} ? $solver_options->{CVodeSetMaxStep} : "-1").";\n";
+	  $driver_file_contents .= "odeopt_SS_timescale = $SS_timescale;\n";
+	  $driver_file_contents .= "odeopt_SS_RelTol    = $SS_RelTol;\n";
+	  $driver_file_contents .= "odeopt_SS_AbsTol    = $SS_AbsTol;\n";
+	  $driver_file_contents .= "odeopts = [odeopt_reltol, odeopt_abstol, odeopt_CVodeSetInitStep, ...\n";
+	  $driver_file_contents .= "           odeopt_CVodeSetMinStep, odeopt_CVodeSetMaxStep, ...\n";
+	  $driver_file_contents .= "           odeopt_SS_timescale, odeopt_SS_RelTol, odeopt_SS_AbsTol];\n\n";
+	  my @ode_events = split(/\s*[, ]\s*/,$ode_event_times);
+	  @ode_events = map {$_ eq '~' ? 0.0 : $_} @ode_events;
+	  $driver_file_contents .= "ode_events = [@ode_events];\n";
+	  $driver_file_contents .= "[t,y,event_flags,event_times] = ${output_file_prefix}CVODEOctWrapper(ivalues,ode_rate_constants,$tv,ode_events,odeopts);\n";
+	} elsif ($solver eq "lsode") {
+	    foreach my $key (keys %$solver_options) {
+		$driver_file_contents .= "lsode_options(\"$key\",".$solver_options->{$key}.")\n";
+	    }
+
+	    my $solver_arg = $jacobian_flag ? "{\@${output_file_prefix}_odes, \@${output_file_prefix}_jac}" : "\@${output_file_prefix}_odes";
+	    $driver_file_contents .= "y= $solver($solver_arg, ivalues, (t=$tv')";
+
+	    if (defined $ode_event_times) {
+		my @ode_events = split(/\s*[, ]\s*/,$ode_event_times);
+		$driver_file_contents .= ", [@ode_events]);\n";
+	    } else {
+		$driver_file_contents .= ");\n";
+	    }
+	} else {
+	    # assume solver is one of the odepkg solvers, which support odeset
+
+	    my @solver_options = ();
+	    foreach my $key (keys %$solver_options) {
+		push @solver_options, "'$key'";
+		push @solver_options, "$solver_options->{$key}";
+	    }
+
+	    if ($jacobian_flag) {
+		push @solver_options, ("'Jacobian'", "\@${output_file_prefix}_jac");
+	    }
+
+	    my $solver_options_string = "odeset(".join(",",@solver_options).")";
+
+	    if (defined $ode_event_times) {
+		print "WARNING: ode_event_times not supported for Octave/odepkg output\n";
+	    }
+	    $driver_file_contents .= "[t,y] = $solver(\@${output_file_prefix}_odes, [t0, tf], ivalues, $solver_options_string);\n";
+	}
     }
+    $driver_file_contents .= "\n";
 
     $driver_file_contents .= "% map free node state vector names\n";
     for (my $j = 0; $j < @free_node_names; $j++) {
@@ -304,7 +303,6 @@ sub export_matlab_files {
 	my $variable_index = $variable_ref->get_index();
 	my $variable_name = $variable_ref->get_name();
 	my $variable_value = $variable_ref->get_value();
-	my $is_expression_flag = $variable_ref->get_is_expression_flag();
 	$driver_file_contents .= "$variable_name = $variable_value;\n";
     }
     $driver_file_contents .= "\n";
@@ -315,13 +313,13 @@ sub export_matlab_files {
 	my $variable_index = $variable_ref->get_index();
 	my $variable_name = $variable_ref->get_name();
 	my $variable_value = $variable_ref->get_value();
-	my $is_expression_flag = $variable_ref->get_is_expression_flag();
 	$driver_file_contents .= "$variable_name = $variable_value;\n";
     }
     $driver_file_contents .= "\n";
 
     # plot free nodes
     my $fig_num = 100;
+    my $plot_format = $matlab_output ? "\'.-\'" : "\'o-\', 'markersize', 6";
     # comment out plot commands if user didn't specify -P on command line
     my $plot_prefix = ($plot_flag ? "" : "%");
     my @probed_nodes = grep ($_->get_probe_flag(), @free_nodes);
@@ -332,7 +330,7 @@ sub export_matlab_files {
 	my $title = length($node_name) <= 40 ? $node_name : substr($node_name, 0, 40).".....(truncated)";
 	$title =~ s/_/\\_/g;  # escape underscore for Matlab (otherwise interprets as subscript)
 	# plot command uses convert routine
-	$driver_file_contents .= "${plot_prefix}figure(".$fig_num++.");plot(t, $node_name);title(\'$title\')\n";
+	$driver_file_contents .= "${plot_prefix}figure(".$fig_num++.");plot(t, $node_name, $plot_format);title(\'$title\')\n";
     }
     $driver_file_contents .= "\n";
 
@@ -348,13 +346,232 @@ sub export_matlab_files {
 	$title = "$probe_name=$title";
 	$title =~ s/_/\\_/g;  # escape underscore for Matlab (otherwise interprets as subscript)
 	$driver_file_contents .= "$probe_name = $probe_value;\n";
-	$driver_file_contents .= "${plot_prefix}figure(".$fig_num++."); plot(t, $probe_name);title(\'$title\');\n";
+	$driver_file_contents .= "${plot_prefix}figure(".$fig_num++.");plot(t, $probe_name, $plot_format);title(\'$title\');\n";
+    }
+    $driver_file_contents .= "\n";
+
+    $driver_file_contents .= "if (ode_num_calls > 0)\n";
+    $driver_file_contents .= "  ode_avg_cputime = ode_tot_cputime/ode_num_calls*1000;\n";
+    $driver_file_contents .= "  str = sprintf('ODE STATS: num ode calls=%d, tot time=%f, avg time=%fms', ode_num_calls, ode_tot_cputime, ode_avg_cputime);\n";
+    $driver_file_contents .= "  disp (str)\n";
+    $driver_file_contents .= "end\n";
+    if ($jacobian_flag) {
+      $driver_file_contents .= "if (jac_num_calls > 0)\n";
+      $driver_file_contents .= "  jac_avg_cputime = jac_tot_cputime/jac_num_calls*1000;\n";
+      $driver_file_contents .= "  str = sprintf('JAC STATS: num jac calls=%d, tot time=%f, avg time=%fms', jac_num_calls, jac_tot_cputime, jac_avg_cputime);\n";
+      $driver_file_contents .= "  disp (str)\n";
+      $driver_file_contents .= "end\n";
     }
     $driver_file_contents .= "\n";
 
     # please don't remove this 'done' message
     $driver_file_contents .= "% issue done message for calling/wrapper scripts\n";
-    $driver_file_contents .= "disp('Facile driver script done');\n\n";
+    $driver_file_contents .= "str = sprintf('Facile driver script done (elapsed time %f)',toc);\n";
+    $driver_file_contents .= "disp (str)\n\n";
+
+    #********************************************************#
+    # generate dydt function                                 #
+    #********************************************************#
+    $ode_file_contents{header} .= "% File generated by Facile version $VERSION\n%\n";
+    if ($matlab_output) {
+	$ode_file_contents{header} .= "function dydt = ".$output_file_prefix."_odes(t, y)\n\n";
+	$ode_file_contents{header} .= "global event_flags;\nglobal event_times\n\n" if defined $ode_event_times;
+    } else {
+	# octave output
+	if ($solver eq 'lsode') {
+	    $ode_file_contents{header} .= "function dydt = ".$output_file_prefix."_odes(y, t)\n\n";
+	} else {
+	    $ode_file_contents{header} .= "function dydt = ".$output_file_prefix."_odes(t, y)\n\n";
+	}
+    }
+    $ode_file_contents{header} .= "global ode_tot_cputime;\n";
+    $ode_file_contents{header} .= "global ode_num_calls;\n";
+    $ode_file_contents{header} .= "ode_start_time = cputime;\n";
+    $ode_file_contents{header} .= "ode_num_calls = ode_num_calls + 1;\n";
+    $ode_file_contents{all} .= $ode_file_contents{header};
+
+    # Clock tick
+    if ($tk != -1) {
+	$ode_file_contents{tick} .= "persistent last_tick\n";
+	$ode_file_contents{tick} .= "\n";
+	$ode_file_contents{tick} .= "if (isempty(last_tick))\n";
+	$ode_file_contents{tick} .= "  last_tick = 0;\n";
+	$ode_file_contents{tick} .= "end\n";
+	$ode_file_contents{tick} .= "\n";
+	$ode_file_contents{tick} .= "if (t - last_tick >= $tk)\n";
+	$ode_file_contents{tick} .= "  str = sprintf('ode: sim time is t=%f, elapsed time=%f', t, toc);\n";
+	$ode_file_contents{tick} .= "  disp (str)\n";
+	$ode_file_contents{tick} .= "  last_tick = t;\n";
+	$ode_file_contents{tick} .= "end\n";
+	$ode_file_contents{tick} .= "\n";
+	$ode_file_contents{all} .= $ode_file_contents{tick};
+    }
+	
+    # map state vector to free nodes
+    $ode_file_contents{node_map} .= "% state vector to node mapping\n";
+    for (my $j = 0; $j < @free_nodes; $j++) {
+	my $node_ref = $free_nodes[$j];
+	my $node_name = $node_ref->get_name();
+	$ode_file_contents{node_map} .= "$node_name = y(".($j+1).");\n";
+    }	
+    $ode_file_contents{node_map} .= "\n";
+    $ode_file_contents{all} .= $ode_file_contents{node_map};
+
+    # ordinary rate constants (e.g. f1=1) and constant rate expressions (e.g. f2=2*f1)
+    $ode_file_contents{consts} .= "% constants and constant expressions\n" if (@ode_rate_constants);
+    $ode_file_contents{consts} .= "global ode_rate_constants;\n" if (@ode_rate_constants);
+    for (my $i = 0; $i < @ode_rate_constants; $i++) {
+	my $variable_ref = $ode_rate_constants[$i];
+	my $variable_name = $variable_ref->get_name();
+	my $variable_value = $variable_ref->get_value();
+	$ode_file_contents{consts} .= "$variable_name = ode_rate_constants(".($i+1).");\n";
+    }
+    $ode_file_contents{consts} .= "\n";
+    $ode_file_contents{all} .= $ode_file_contents{consts};
+
+    # moiety totals, e.g. E_moiety = 123 (mol/L)
+    $ode_file_contents{moiety} .= "% moiety totals\n" if (@moiety_totals);
+    foreach my $variable_ref (@moiety_totals) {
+	my $variable_index = $variable_ref->get_index();
+	my $variable_name = $variable_ref->get_name();
+	my $variable_value = $variable_ref->get_value();
+	$ode_file_contents{moiety} .= "$variable_name = $variable_value;\n";
+    }
+    $ode_file_contents{moiety} .= "\n";
+    $ode_file_contents{all} .= $ode_file_contents{moiety};
+
+    # contrained node expressions, e.g. E = C - E_moiety
+    $ode_file_contents{cnodes} .= "% dependent species\n" if (@constrained_node_expressions);
+    foreach my $variable_ref (@constrained_node_expressions) {
+	my $variable_index = $variable_ref->get_index();
+	my $variable_name = $variable_ref->get_name();
+	my $variable_value = $variable_ref->get_value();
+	$ode_file_contents{cnodes} .= "$variable_name = $variable_value;\n";
+    }
+    $ode_file_contents{cnodes} .= "\n";
+    $ode_file_contents{all} .= $ode_file_contents{cnodes};
+
+    # rate expressions
+    $ode_file_contents{dynrates} .= "% dynamic rate expressions\n" if (@dynamic_rate_expressions);
+    foreach my $variable_ref (@dynamic_rate_expressions) {
+	my $variable_index = $variable_ref->get_index();
+	my $variable_name = $variable_ref->get_name();
+	my $variable_value = $variable_ref->get_value();
+	$ode_file_contents{dynrates} .= "$variable_name = $variable_value;\n";
+    }
+    $ode_file_contents{dynrates} .= "\n";
+    $ode_file_contents{all} .= $ode_file_contents{dynrates};
+
+    # print out differential equations for the free nodes
+    $ode_file_contents{dydt} .= "% differential equations for independent species\n";
+    $ode_file_contents{dydt} .= "dydt(size(y,1),1) = 0;\n";
+
+    my @ode_rhs = ();
+    for (my $j = 0; $j < @free_nodes; $j++) {
+	my $node_ref = $free_nodes[$j];
+	my $node_name = $node_ref->get_name();
+
+	my $ode_rhs = "";
+
+	my @create_reactions = $node_ref->get_create_reactions();
+	my @destroy_reactions = $node_ref->get_destroy_reactions();
+
+	# print positive terms
+	foreach my $reaction_ref (@create_reactions) {
+	    my $velocity = $reaction_ref->get_velocity();
+	    $ode_rhs .= "+ $velocity ";
+	}
+	# print negative terms
+	foreach my $reaction_ref (@destroy_reactions) {
+	    my $velocity = $reaction_ref->get_velocity();
+	    $ode_rhs .= "- $velocity ";
+	}
+
+	push @ode_rhs, $ode_rhs;
+
+	if ($factor_flag) {
+	    $ode_rhs = Expression->new({value=>$ode_rhs})->factor_expression();
+ 	}
+
+	if ($ode_rhs ne "") {
+	    $ode_file_contents{dydt} .= "dydt(".($j+1).")= $ode_rhs;\n";
+	} else {
+	    $ode_file_contents{dydt} .= "dydt(".($j+1).")= 0;\n";
+	}
+    }
+    $ode_file_contents{dydt} .= "\n\n";
+    $ode_file_contents{all} .= $ode_file_contents{dydt};
+
+
+    $ode_file_contents{footer} .= "ode_end_time = cputime;\n";
+    $ode_file_contents{footer} .= "ode_tot_cputime = ode_tot_cputime + (ode_end_time - ode_start_time);\n";
+    $ode_file_contents{all} .= $ode_file_contents{footer};
+
+    #********************************************************#
+    # generate jacobian function                             #
+    #********************************************************#
+
+    $jac_file_contents .= "% File generated by Facile version $VERSION\n%\n";
+    if ($matlab_output) {
+	$jac_file_contents .= "function J = ".$output_file_prefix."_jac(t, y)\n\n";
+	$jac_file_contents .= "global event_flags;\nglobal event_times\n\n" if defined $ode_event_times;
+    } else {
+	# octave output
+	if ($solver eq 'lsode') {
+	    $jac_file_contents .= "function J = ".$output_file_prefix."_jac(y, t)\n\n";
+	} else {
+	    $jac_file_contents .= "function J = ".$output_file_prefix."_jac(t, y)\n\n";
+	}
+    }
+
+    $jac_file_contents .= "global jac_tot_cputime;\n";
+    $jac_file_contents .= "global jac_num_calls;\n";
+    $jac_file_contents .= "jac_start_time = cputime;\n";
+    $jac_file_contents .= "jac_num_calls = jac_num_calls + 1;\n";
+
+    # Clock tick
+    if ($tk != -1) {
+	$jac_file_contents .= "persistent last_tick\n";
+	$jac_file_contents .= "\n";
+	$jac_file_contents .= "if (isempty(last_tick))\n";
+	$jac_file_contents .= "  last_tick = 0;\n";
+	$jac_file_contents .= "end\n";
+	$jac_file_contents .= "\n";
+	$jac_file_contents .= "if (t - last_tick >= $tk)\n";
+	$jac_file_contents .= "  str = sprintf('jac: sim time is t=%f, elapsed time=%f', t, toc);\n";
+	$jac_file_contents .= "  disp (str)\n";
+	$jac_file_contents .= "  last_tick = t;\n";
+	$jac_file_contents .= "end\n";
+	$jac_file_contents .= "\n";
+    }
+
+    # other sections are the same as the ode file
+    $jac_file_contents .= $ode_file_contents{node_map};
+    $jac_file_contents .= $ode_file_contents{consts};
+    $jac_file_contents .= $ode_file_contents{moiety};
+    $jac_file_contents .= $ode_file_contents{cnodes};
+    $jac_file_contents .= $ode_file_contents{dynrates};
+
+    # now generate equations for jacobian
+    $jac_file_contents .= "% jacobian equations for independent species\n";
+    $jac_file_contents .= "J = zeros(size(y,1),size(y,1));\n";
+    for (my $j = 0; $j < @free_nodes; $j++) {
+	my $ode_rhs_ex_ref = Expression->new({value=>$ode_rhs[$j]});
+	for (my $k = 0; $k < @free_nodes; $k++) {
+	    my $dvar = $free_nodes[$k]->get_name();
+	    my $jac_rhs = $ode_rhs_ex_ref->differentiate_expression($dvar);
+	    if ($jac_rhs ne "0") {
+		if ($factor_flag) {
+		    $jac_rhs = Expression->new({value=>$jac_rhs})->factor_expression();
+		}
+		$jac_file_contents .= "J(".($j+1).",".($k+1).") = $jac_rhs;\n";
+	    }
+	}
+    }
+
+    # timings
+    $jac_file_contents .= "jac_end_time = cputime;\n";
+    $jac_file_contents .= "jac_tot_cputime = jac_tot_cputime + (jac_end_time - jac_start_time);\n";
 
     #********************************************************#
     # generate species conversion function                   #
@@ -383,12 +600,13 @@ sub export_matlab_files {
     $rate_index_mapper_file_contents .= "\tn= -1;\nend;"; 
 
     return (
-	$ode_file_contents,
 	$driver_file_contents,
+	$ode_file_contents{all},
+	$jac_file_contents,
 	$species_index_mapper_file_contents,
 	$rate_index_mapper_file_contents,
 	$IC_file_contents,
-	$R_file_contents,
+	$rates_file_contents,
        );
 }
 

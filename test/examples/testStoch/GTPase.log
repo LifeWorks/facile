@@ -1,0 +1,7 @@
+Facile version 0.53
+Copyright (c) 2003-2012, Ollivier, Siso, Swain et al.
+Warning: rate bc1 has value of zero
+Note: input file for stochastic sims is test/examples/testStoch/GTPase.seqn
+Note: Matlab conversion script for stochastic sims is test/examples/testStoch/GTPase_convert.m
+Facile done.
+

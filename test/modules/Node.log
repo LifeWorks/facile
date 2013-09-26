@@ -2,6 +2,7 @@ Testing class: Node
 Creating node object: {
   'Node' => {
               'ID' => -1,
+              'is_extern_flag' => 0,
               'index' => 0,
               'create_reactions_ref' => [],
               'destroy_reactions_ref' => [],

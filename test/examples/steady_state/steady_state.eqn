@@ -42,5 +42,7 @@ SS_AbsTol = 1e-6
 t_final = 1000.0
 t_vector = [t0:0.01:tf]        # sampling vector for matlab
 
-matlab_odeset_options = odeset('RelTol', 1e-6, 'AbsTol', 1e-12)
+matlab_solver_options{RelTol} = 1e-6
+matlab_solver_options{AbsTol} = 1e-12
+
 

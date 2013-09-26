@@ -1,0 +1,6 @@
+Facile version 0.53
+Copyright (c) 2003-2012, Ollivier, Siso, Swain et al.
+Note: input file for stochastic sims is test/examples/repression/repression.seqn
+Note: Matlab conversion script for stochastic sims is test/examples/repression/repression_convert.m
+Facile done.
+

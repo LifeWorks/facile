@@ -115,7 +115,7 @@ sub run_testcases {
 	product_names_ref => ["Z"],
 	rate_ref => $rate_ref,
 	source_line => "X + Y -> Z",
-	is_rate_law_flag => 1,
+	is_rate_law_flag => 0,
     });
     print $rx1_ref->_DUMP();
 

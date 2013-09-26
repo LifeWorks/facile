@@ -26,10 +26,10 @@
 #- General options
 #-
 #- (-H) --extended_help     Extended help screen
-#- (-h) --quick_help        Quick help screen
+#- (-h) --help              Quick help screen
 #-
 #- (-V) --verbose           More verbose output
-#- (-q) --quiet             Quiet mode, suppresses some warnings
+#- (-q) --quiet             Quiet mode, suppresses some warnings and messages
 #- (-E) --echo              Echo output to STDOUT
 #- (-o) --prefix (prefix)   Specifies prefix for output files
 #-
@@ -38,14 +38,28 @@
 #- (-M) --mathematica       Mathematica input file (default)
 #- (-L) --maple             Maple input file
 #- (-m) --matlab            Matlab driver script and functions (optionally with -r)
-#- (-p) --split             Split output into top-lvl script and sub-scripts with
-#-                          containing rates and ICs (Matlab only).
+#- (-O) --octave            Octave driver script and functions (optionally with -r)
+#- (-y) --python            Python/SciPy driver script and functions (optionally with -r)
+#-      --cpp               C++ driver script and functions (optionally with -r)
 #- (-x) --xpp               XPP input file (optionally with -r)
 #- (-s) --easystoch         EasyStoch simulation input file and Matlab conversion
 #-                          script for EasyStoch output.
 #- (-a) --auto              AUTO output, implies (-r) (optionally with -A)
 #- (-S) --sbml              Export to SBML file.
 #-
+#- Output modifiers
+#-
+#- (-p) --split             Split output into top-lvl script and sub-scripts with
+#-                          containing rates and ICs (Matlab, Octave, SciPy only).
+#-      --extern            In driver script, don't set external parameters and/or ICs
+#-                          to a value in equation file (Matlab/Octave only). This allows
+#-                          those parameters and species designated in the CONFIG section
+#-                          to be set outside the driver.
+#-      --jacobian          Generate a jacobian function.
+#-      --factor            Factor out common variables from terms in dydt and jacobian function
+#-                          to make them more efficient.
+#-                          CAUTION: compare results w/ and w/o to ensure correctness of
+#-                          refactoring result.
 #- (-r) --reduce            Reduce equations using moiety and constraint identification algorithm
 #- (-R) --matrix            Same as -r except that stoichiometry matrix is output to a file.
 #-
@@ -53,27 +67,40 @@
 #-
 #- (-A) --ss_file (file)    Reads initial solution from file
 #-
-#- Simulation
+#- Simulation parameters
 #-
 #- (-t) --t_final    (time)      Final integration time 'tf' (Matlab; default NO_TIME_SPECIFIED)
 #- (-v) --t_sampling (vector)    Sampling time list for state vector (Matlab; defaults '[t0 tf]')
-#- (-k) --t_tick     (tick)      Progress messages tick interval (Matlab)
-#- (-l) --solver     (solver)    ODE solver (Matlab; defaults to ode23s)
-#- (-n) --solver_options (option_string) Option string for odeset (Matlab)
-#- (-e) --ode_event_times  (event_list)  Comma-separated list of times where system parameters
+#- (-k) --t_tick     (tick)      Progress messages tick interval (Matlab/SciPy)
+#- (-l) --solver     (solver)    ODE solver
+#-                               For Matlab, overrides matlab_ode_solver configuration variable,
+#-                               which defaults to "ode23s".
+#-                               For Octave, overrides octave_ode_solver configuration variable,
+#-                               which defaults to "lsode".
+#- (-n) --solver_options option,value,...
+#-                               ODE solver options provided as comma-separated option-value pairs.
+#-                               For Matlab, overrides matlab_ode_options configuration variable.
+#-                               For Octave, overrides octave_ode_options configuration variable.
+#-                               For SciPy, overrides scipy_ode_options configuration variable.
+#-                               For C++, overrides cpp_ode_options configuration variable.
+#- (-e) --ode_event_times (event_list) Comma-separated list of times where system parameters
 #-                               change discontinuously (Matlab)
-#- (-C) --volume   (volume)      Specify compartment volume (in L)
+#- (-C) --volume (volume)        Specify compartment volume (in L)
 #- (-P) --plot                   Plot probes (matlab only).
+#-
+#- Miscellaneous
+#-
+#-      -- run                   Run the selected target simulator.
 #-
 #- If the --prefix option is not used, facile uses the name of input file, with the
 #- extension (e.g. .txt or .eqn) removed, as the output file prefix.
 #-
 #- EXAMPLES:
 #-
+#- facile.pl --run -P -m <input file>   # generates Matlab scripts with commented-in plot commands, runs Matlab
+#- facile.pl -s <input file>            # generates input file for EasyStoch stochastic simulator
 #- facile.pl <input file>               # defaults to Mathematica output
 #- facile.pl -E <input file>            # echo Mathematica eqns to screen
-#- facile.pl -m <input file>            # generates Matlab scripts
-#- facile.pl -s <input file>            # output for stochastic simulator
 #- echo 'A+B->C; f=1' | facile.pl -E -  # grab equation from stdin and display
 #-
 ##############################################################################
@@ -103,11 +130,10 @@
 #+    in the appropriate differential equation.  Hence any valid Matlab expression
 #+    can be supplied, including functions of time and/or of concentrations.
 #+
-#+    For a stochastic sim, the rate expression in quotes is evaluated at t=0
-#+    and at each time supplied as a simulation event.  The stochastic simulator
-#+    uses the evaluated value until the next simulation event.  Hence only
-#+    discontinuous, discrete rate value changes are supported.  The expression
-#+    must evaluate to a constant between the supplied event times.  Currently,
+#+    For EasyStoch output, the rate expression in quotes is evaluated at t=0
+#+    and at each time supplied through the easystoch_sample_times configuration
+#+    variable.  EasyStoch uses the evaluated values to build a piecewise-constant
+#+    or piecewise-linear approximation for the expression. Currently,
 #+    the function square() can be included in the expression, and also the
 #+    value 'pi'.
 #+
@@ -156,13 +182,16 @@ use English;
 use FindBin qw($Bin);
 use lib "$Bin/modules";
 
-# Report version
-use vars qw($VERSION);
-$VERSION = "0.41";
-print "Facile version $VERSION\nCopyright (c) 2003-2012, Ollivier, Siso, Swain et al.\n";
-exit if (grep(/--version/, @ARGV) == 1);
-
 use Globals;
+
+# Report version
+$VERSION = "0.53a";
+print <<HEADER;
+Facile version $VERSION
+Copyright (c) 2003-2013, Ollivier, Siso, Swain et al.
+HEADER
+
+exit if (grep(/--version/, @ARGV) == 1);
 
 use Model;  # main class for reading, processing and exporting model
 
@@ -175,6 +204,9 @@ my $output_file_prefix;
 my $mathematica_output;         # flag; default is Mathematica output
 my $maple_output;
 my $matlab_output;		# flag
+my $octave_output;		# flag
+my $scipy_output;               # flag
+my $cpp_output;
 my $xpp_output;                 # flag
 my $easystoch_output;		# flag
 my $auto_output;                # flag
@@ -184,16 +216,13 @@ my $reduce_flag;
 my $reduce_and_output_flag;
 
 my $split_flag;
+my $extern_flag;
+my $factor_flag;
+my $jacobian_flag;
 
 my $echo_stdout = 0;            # if set, will echo main output file to STDOUT
 
-my ($extended_help, $quick_help);
-
-#######################################################################################
-# Model instantiation
-#######################################################################################
-my $model_ref = Model->new();
-my $config_ref = $model_ref->get_config_ref();
+my ($extended_help, $help);
 
 #######################################################################################
 # Command line and switch processing
@@ -202,10 +231,12 @@ my $config_ref = $model_ref->get_config_ref();
 use Getopt::Long;    # Standard package for options processing
 Getopt::Long::Configure("bundling");
 
+my $opt_ref = {};
+
 my $get_opt_result = GetOptions (
     "extended_help|H" => \$extended_help,
-    "quick_help|h" => \$quick_help,
-
+    "help|h" => \$help,
+    "quick_help" => \$help,
     "verbose|V" => \$verbose,
     "quiet|q" => \$quiet,
     "echo|E" => \$echo_stdout,
@@ -214,29 +245,122 @@ my $get_opt_result = GetOptions (
     "mathematica|M" => \$mathematica_output,
     "maple|L" => \$maple_output,
     "matlab|m" => \$matlab_output,
-    "split|p" => \$split_flag,
+    "octave|O" => \$octave_output,
+    "scipy|y" => \$scipy_output,
+    "cpp" => \$cpp_output,
     "xpp|x" => \$xpp_output,
     "easystoch|s" => \$easystoch_output,
     "auto|a" => \$auto_output,
     "sbml|S" => \$sbml_output,
 
+    "split|p" => \$split_flag,
+    "extern" => \$extern_flag,
+    "factor" => \$factor_flag,
+    "jacobian" => \$jacobian_flag,
+
     "reduce|r" => \$reduce_flag,
     "matrix|R" => \$reduce_and_output_flag,
     "ss_file|A" => \$steady_state_file,
 
-    "t_final|t=f" => \$config_ref->{tf},
-    "t_sampling|v=s" => \$config_ref->{tv},
-    "t_tick|k=f" => \$config_ref->{tk},
-    "solver|l=s" => \$config_ref->{solver},
-    "solver_options|n=s" => \$config_ref->{solver_options},
-    "ode_event_times|e=s" => \$config_ref->{ode_event_times},
-    "volume|C=f" => \$config_ref->{compartment_volume},
+    "t_final|t=f" => \$opt_ref->{tf},
+    "t_sampling|v=s" => \$opt_ref->{tv},
+    "t_tick|k=f" => \$opt_ref->{tk},
+    "solver|l=s" => \$opt_ref->{solver},
+    "solver_options|n=s" => \$opt_ref->{solver_options},
+    "ode_event_times|e=s" => \$opt_ref->{ode_event_times},
+    "volume|C=f" => \$opt_ref->{compartment_volume},
 
-    "plot|P" => \$config_ref->{plot_flag},
+    "plot|P" => \$opt_ref->{plot_flag},
+
+    "run" => \$opt_ref->{run_flag},
 );
 
+# option --auto implies option --reduce
+if ($auto_output) {
+    $reduce_flag = 1;
+}
 
-if ($extended_help || $quick_help) {
+$matlab_output = $matlab_output ? 1 : 0;
+$octave_output = $octave_output ? 1 : 0;
+$scipy_output = $scipy_output ? 1 : 0;
+$cpp_output = $cpp_output ? 1 : 0;
+$easystoch_output = $easystoch_output ? 1 : 0;
+$xpp_output = $xpp_output ? 1 : 0;
+$mathematica_output = $mathematica_output ? 1 : 0;
+$maple_output = $maple_output ? 1 : 0;
+$sbml_output = $sbml_output ? 1 : 0;
+$auto_output = $auto_output ? 1 : 0;
+$reduce_flag = $reduce_flag ? 1 : 0;
+$reduce_and_output_flag = $reduce_and_output_flag ? 1 : 0;
+
+my $num_output_flags = ($matlab_output + $octave_output + $scipy_output + $cpp_output +
+			$easystoch_output + $xpp_output +
+			$mathematica_output + $maple_output +
+			$sbml_output + $auto_output);
+
+if ($num_output_flags > 1) {
+  print "ERROR: you can't specify more than one output type\n";
+  exit(1);
+}
+
+# If user has not specified anything to do, default is to generate Mathematica file
+# and output its contents to STDOUT.
+if (($num_output_flags + $reduce_and_output_flag) == 0) {
+    $mathematica_output = 1;
+    $echo_stdout = 1;
+}
+
+#######################################################################################
+# Model instantiation
+#######################################################################################
+my $model_ref = Model->new();
+my $config_ref = $model_ref->get_config_ref();
+$config_ref->{opt_ref} = $opt_ref;
+
+$config_ref->{output_type} = "matlab" if ($matlab_output);
+$config_ref->{output_type} = "octave" if ($octave_output);
+$config_ref->{output_type} = "scipy" if ($scipy_output);
+$config_ref->{output_type} = "cpp" if ($cpp_output);
+$config_ref->{output_type} = "easystoch" if ($easystoch_output);
+$config_ref->{output_type} = "xpp" if ($xpp_output);
+$config_ref->{output_type} = "mathematica" if ($mathematica_output);
+$config_ref->{output_type} = "maple" if ($maple_output);
+$config_ref->{output_type} = "sbml" if ($sbml_output);
+$config_ref->{output_type} = "auto" if ($auto_output);
+
+# copy args into model config
+if (defined $opt_ref->{solver}) {
+  $config_ref->{matlab_ode_solver} = $opt_ref->{solver} if ($matlab_output);
+  $config_ref->{octave_ode_solver} = $opt_ref->{solver} if ($octave_output);
+  $config_ref->{scipy_ode_solver} = $opt_ref->{solver} if ($scipy_output);
+  $config_ref->{cpp_ode_solver} = $opt_ref->{solver} if ($cpp_output);
+}
+if (defined $opt_ref->{solver} && defined $opt_ref->{solver_options}) {
+  # solver options given as comma-separated pair list
+  my @solver_options = split(",",$opt_ref->{solver_options});
+  if (@solver_options % 2 != 0) {
+    print "ERROR: solver options must be given as option,value pairs on command line\n";
+    exit(1);
+  }
+  $opt_ref->{solver_options} = {@solver_options};
+  $config_ref->{matlab_solver_options} = {@solver_options} if ($matlab_output);
+  $config_ref->{octave_solver_options}{$opt_ref->{solver}} = {@solver_options} if ($octave_output);
+  $config_ref->{scipy_solver_options}{$opt_ref->{solver}} = {@solver_options} if ($scipy_output);
+  $config_ref->{cpp_solver_options}{$opt_ref->{solver}} = {@solver_options} if ($cpp_output);
+}
+
+foreach my $key (keys %$opt_ref) {
+  next if ($key eq "solver");
+  next if ($key eq "solver_options");
+  $config_ref->{$key} = $opt_ref->{$key} if defined $opt_ref->{$key};
+}
+
+if ($octave_output && $matlab_output) {
+    print "ERROR: can't output both Octave and Matlab scripts\n";
+    exit(1);
+}
+
+if ($extended_help || $help) {
   open (SLURP, "< $PROGRAM_NAME") || return undef;
   my @help = <SLURP>;
   close SLURP;
@@ -298,20 +422,6 @@ if ($output_file_prefix =~ /(.*)\/(.*)/) {
     $output_file_directory = ".";
 }
 
-# option --auto implies option --reduce
-if ($auto_output) {
-    $reduce_flag = 1;
-}
-
-# If user has not specified anything to do, default is to generate Mathematica file
-# and output its contents to STDOUT.
-if (!$matlab_output && !$easystoch_output && !$xpp_output &&
-    !$mathematica_output && !$maple_output && !$sbml_output &&
-    !$auto_output && !$reduce_flag && !$reduce_and_output_flag) {
-    $mathematica_output = 1;
-    $echo_stdout = 1;
-}
-
 #######################################################################################
 # Preprocess input file
 #######################################################################################
@@ -328,7 +438,7 @@ $model_ref->parse_moiety_section() if ($reduce_flag || $reduce_and_output_flag);
 $model_ref->parse_bifurc_param_section() if ($auto_output);
 $model_ref->parse_promoter_section();
 
-$model_ref->parse_config_section();
+$model_ref->parse_config_section($opt_ref);
 
 $model_ref->parse_probe_section();
 
@@ -345,7 +455,7 @@ if ($reduce_and_output_flag) {
 #######################################################################################
 # Generate output files as required.
 #######################################################################################
-# print out Mathematica format equations
+# write out Mathematica format equations
 if ($mathematica_output) {
     my $mathematica_file_name = "$output_file_directory/$output_file_prefix.ma";
     my $mathematica_file_contents = $model_ref->export_mathematica_file();
@@ -360,7 +470,7 @@ if ($mathematica_output) {
     close FILE;
 }
 
-# print out Maple format equations
+# write out Maple format equations
 if ($maple_output) {
     my $maple_file_name = "$output_file_directory/$output_file_prefix.maple";
     my $maple_file_contents = $model_ref->export_maple_file(
@@ -377,7 +487,7 @@ if ($maple_output) {
     close FILE;
 }
 
-# print out EasyStoch input file
+# write out EasyStoch input file
 if ($easystoch_output) {
     my $stochastic_equation_file_name = "$output_file_directory/${output_file_prefix}.seqn";
     my $stochastic_equation_file_contents = $model_ref->export_easystoch_input_file();
@@ -400,59 +510,141 @@ if ($easystoch_output) {
     close FILE;
 }
 
-# print out Matlab scripts
-if ($matlab_output) {
-    my $ode_file_name = "$output_file_directory/${output_file_prefix}_odes.m";
+# write out Matlab or Octave scripts
+if ($matlab_output || $octave_output) {
     my $driver_file_name = "$output_file_directory/${output_file_prefix}Driver.m";
+    my $ode_file_name = "$output_file_directory/${output_file_prefix}_odes.m";
+    my $jac_file_name = "$output_file_directory/${output_file_prefix}_jac.m";
     my $node_index_mapper_file_name = "$output_file_directory/${output_file_prefix}_s.m";
     my $rate_index_mapper_file_name = "$output_file_directory/${output_file_prefix}_r.m";
     my $ode_event_file_name = "$output_file_directory/${output_file_prefix}_ode_event.m";
-    my $IC_file_name = "$output_file_directory/${output_file_prefix}_S.m";
-    my $R_file_name = "$output_file_directory/${output_file_prefix}_R.m";
+    my $IC_file_name = "$output_file_directory/${output_file_prefix}_ivals.m";
+    my $rates_file_name = "$output_file_directory/${output_file_prefix}_rates.m";
 
-    my (
+    my ($driver_file_contents,
 	$ode_file_contents,
-	$driver_file_contents,
+	$jac_file_contents,
 	$node_index_mapper_file_contents,
 	$rate_index_mapper_file_contents,
 	$IC_file_contents,
-	$R_file_contents,
-       );
-
-    ($ode_file_contents,
-     $driver_file_contents,
-     $node_index_mapper_file_contents,
-     $rate_index_mapper_file_contents,
-     $IC_file_contents,
-     $R_file_contents) =
+	$rates_file_contents) =
        $model_ref->export_matlab_files(
 	   output_file_prefix => $output_file_prefix,
 	   split_flag => $split_flag,
+	   extern_flag => $extern_flag,
+	   jacobian_flag => $jacobian_flag,
+	   factor_flag => $factor_flag,
+	   octave_output => $octave_output,
 	  );
-    if (defined $config_ref->{ode_event_times}) {
+
+    my $input_file_list = "$driver_file_name, $ode_file_name";
+    $input_file_list .= ", $jac_file_name" if $jacobian_flag;
+    $input_file_list .= ", $IC_file_name, $rates_file_name" if $split_flag;
+    $input_file_list .= ", $node_index_mapper_file_name, $rate_index_mapper_file_name";
+    if ($matlab_output && defined $config_ref->{ode_event_times}) {
       copy("$FindBin::Bin/ode_event.m", "$ode_event_file_name");
-      my $input_file_list = ($split_flag ?
-			     "$ode_file_name, $driver_file_name, $node_index_mapper_file_name, $rate_index_mapper_file_name, $ode_event_file_name, $IC_file_name, $R_file_name":
-			     "$ode_file_name, $driver_file_name, $node_index_mapper_file_name, $rate_index_mapper_file_name, $ode_event_file_name");
-	print "Note: input files for Matlab sims are $input_file_list\n\n" if (!$quiet);
-    } else {
-	my $input_file_list = ($split_flag ?
-			       "$ode_file_name, $driver_file_name, $node_index_mapper_file_name, $rate_index_mapper_file_name, $IC_file_name, $R_file_name" :
-			       "$ode_file_name, $driver_file_name, $node_index_mapper_file_name, $rate_index_mapper_file_name");
-	print "Note: input files for Matlab sims are $input_file_list\n\n" if (!$quiet);
+      $input_file_list .= ", $ode_event_file_name";
     }
+    print "Note: input files for ".($octave_output ? "Octave" : "Matlab")." sims are $input_file_list\n" if (!$quiet);
 
     if ($echo_stdout) {
-	print "$driver_file_contents$ode_file_contents";
+	print "$driver_file_contents$ode_file_contents$jac_file_contents";
     }
+
+    open(FILE, ">$driver_file_name") or die "Can't open $driver_file_name";
+    print FILE "$driver_file_contents";
+    close FILE;	
 
     open(FILE, ">$ode_file_name") or die "Can't open $ode_file_name"; 
     print FILE "$ode_file_contents";
     close FILE;
 
+    if ($jacobian_flag) {
+	open(FILE, ">$jac_file_name") or die "Can't open $jac_file_name"; 
+	print FILE "$jac_file_contents";
+	close FILE;
+    }
+
+    if ($split_flag) {
+	open(FILE, ">$IC_file_name") or die "Can't open $IC_file_name"; 
+	print FILE "$IC_file_contents";
+	close FILE;
+	open(FILE, ">$rates_file_name") or die "Can't open $rates_file_name"; 
+	print FILE "$rates_file_contents";
+	close FILE;
+    }
+
+    open(FILE, ">$node_index_mapper_file_name") or die "Can't open $node_index_mapper_file_name";
+    print FILE "$node_index_mapper_file_contents";
+    close FILE;
+
+    open(FILE, ">$rate_index_mapper_file_name") or die "Can't open $rate_index_mapper_file_name";
+    print FILE "$rate_index_mapper_file_contents";
+    close FILE;
+}
+
+# write out SciPy scripts
+if ($scipy_output && $config_ref->{scipy_ode_solver} ne "cvode") {
+    my $driver_file_name = "$output_file_directory/${output_file_prefix}Driver.py";
+    my $ode_file_name = "$output_file_directory/${output_file_prefix}_odes.py";
+    my $jac_file_name = "$output_file_directory/${output_file_prefix}_jac.py";
+    my $node_index_mapper_file_name = "$output_file_directory/${output_file_prefix}_s.py";
+    my $rate_index_mapper_file_name = "$output_file_directory/${output_file_prefix}_r.py";
+    my $ode_event_file_name = "$output_file_directory/${output_file_prefix}_ode_event.py";
+    my $IC_file_name = "$output_file_directory/${output_file_prefix}_ivals.py";
+    my $rates_file_name = "$output_file_directory/${output_file_prefix}_rates.py";
+
+    my ($driver_file_contents,
+	$ode_file_contents,
+	$jac_file_contents,
+	$node_index_mapper_file_contents,
+	$rate_index_mapper_file_contents,
+	$IC_file_contents,
+	$rates_file_contents) =
+       $model_ref->export_scipy_files(
+	   output_file_prefix => $output_file_prefix,
+	   split_flag => $split_flag,
+	   extern_flag => $extern_flag,
+	   jacobian_flag => $jacobian_flag,
+	   factor_flag => $factor_flag,
+	  );
+    my $input_file_list = "$driver_file_name, $ode_file_name";
+    $input_file_list .= ", $jac_file_name" if $jacobian_flag;
+    $input_file_list .= ", $IC_file_name, $rates_file_name" if $split_flag;
+    $input_file_list .= ", $node_index_mapper_file_name, $rate_index_mapper_file_name";
+#    if (defined $config_ref->{ode_event_times}) {
+#      copy("$FindBin::Bin/ode_event.m", "$ode_event_file_name");
+#      $input_file_list .= ", $ode_event_file_name";
+#    } else {
+    print "Note: input files for SciPy sims are $input_file_list\n" if (!$quiet);
+#    }
+
+    if ($echo_stdout) {
+	print "$driver_file_contents$ode_file_contents";
+    }
+
     open(FILE, ">$driver_file_name") or die "Can't open $driver_file_name";
     print FILE "$driver_file_contents";
     close FILE;	
+
+    open(FILE, ">$ode_file_name") or die "Can't open $ode_file_name"; 
+    print FILE "$ode_file_contents";
+    close FILE;
+
+    if ($jacobian_flag) {
+	open(FILE, ">$jac_file_name") or die "Can't open $jac_file_name"; 
+	print FILE "$jac_file_contents";
+	close FILE;
+    }
+
+    if ($split_flag) {
+	open(FILE, ">$IC_file_name") or die "Can't open $IC_file_name"; 
+	print FILE "$IC_file_contents";
+	close FILE;
+	open(FILE, ">$rates_file_name") or die "Can't open $rates_file_name"; 
+	print FILE "$rates_file_contents";
+	close FILE;
+    }
 
     open(FILE, ">$node_index_mapper_file_name") or die "Can't open $node_index_mapper_file_name";
     print FILE "$node_index_mapper_file_contents";
@@ -462,17 +654,72 @@ if ($matlab_output) {
     print FILE "$rate_index_mapper_file_contents";
     close FILE;
 
-    if ($split_flag) {
-	open(FILE, ">$IC_file_name") or die "Can't open $IC_file_name"; 
-	print FILE "$IC_file_contents";
-	close FILE;
-	open(FILE, ">$R_file_name") or die "Can't open $R_file_name"; 
-	print FILE "$R_file_contents";
-	close FILE;
+}
+
+# write out and compile Sundials/CVODE C++ code, wrappers
+if (($cpp_output && $config_ref->{cpp_ode_solver} eq "cvode") ||
+    ($octave_output && $config_ref->{octave_ode_solver} eq "cvode")){
+    my $driver_file_name = "$output_file_directory/${output_file_prefix}Driver.cpp";
+    my $cvode_header_file_name = "$output_file_directory/${output_file_prefix}CVODE.h";
+    my $cvode_file_name = "$output_file_directory/${output_file_prefix}CVODE.cpp";
+    my $octwrap_file_name = "$output_file_directory/${output_file_prefix}CVODEOctWrapper.cpp";
+    my ($driver_file_contents, $cvode_header_file_contents, $cvode_file_contents, $octwrap_file_contents) =
+       $model_ref->export_cvode_files(
+	   output_file_prefix => $output_file_prefix,
+	   split_flag => $split_flag,
+	   extern_flag => $extern_flag,
+	   jacobian_flag => $jacobian_flag,
+	   factor_flag => $factor_flag,
+	  );
+
+    open(FILE, ">$driver_file_name") or die "Can't open $driver_file_name";
+    print FILE "$driver_file_contents";
+    close FILE;	
+
+    open(FILE, ">$cvode_header_file_name") or die "Can't open $cvode_header_file_name";
+    print FILE "$cvode_header_file_contents";
+    close FILE;	
+
+    open(FILE, ">$cvode_file_name") or die "Can't open $cvode_file_name";
+    print FILE "$cvode_file_contents";
+    close FILE;	
+
+    print "Note: C++ files for CVODE sims are $driver_file_name, $cvode_header_file_name, $cvode_file_name\n" if (!$quiet);
+    print "Compiling shared lib and C++ driver using the commands:\n";
+    $config_ref->{cvode_executable_file} = "$output_file_directory/${output_file_prefix}CVODE";
+
+#g++ -shared -o libpoissonCVODE.so ./poissonCVODE.cpp
+#g++ -L/usr/lib -L. -Wl,-rpath=. -o poissonCVODE poissonDriver.cpp -lpoissonCVODE -lsundials_cvode -lsundials_nvecserial -lm -llapack -lblas
+#mkoctfile -L. -lpoissonCVODE '-Wl,-rpath=.' -lsundials_cvode -lsundials_nvecserial -lm -llapack -lblas poissonCVODEOctWrapper.cpp
+
+    $config_ref->{cvode_compile_command} = <<CMD;
+g++ -O3 -shared -o lib${output_file_prefix}CVODE.so ./${output_file_prefix}CVODE.cpp
+g++ -O3 -L/usr/lib -L. -Wl,-rpath=. -o $config_ref->{cvode_executable_file} $driver_file_name \\
+    -l${output_file_prefix}CVODE -lsundials_cvode -lsundials_nvecserial -lm -llapack -lblas
+CMD
+    print $config_ref->{cvode_compile_command}."\n";
+    system("rm -f lib${output_file_prefix}CVODE.so $config_ref->{cvode_executable_file} ");
+    system($config_ref->{cvode_compile_command});
+
+    if ($octave_output) {
+      print "Note: Octave wrapper file for CVODE C++ code is $octwrap_file_name\n" if (!$quiet);
+      open(FILE, ">$octwrap_file_name") or die "Can't open $octwrap_file_name";
+      print FILE "$octwrap_file_contents";
+      close FILE;	
+
+      print "Compiling Octave oct-file wrapper using command:\n";
+      $config_ref->{mkoctfile_command} = "mkoctfile -L. -l${output_file_prefix}CVODE '-Wl,-rpath=.' -lsundials_cvode -lsundials_nvecserial -lm -llapack -lblas ${output_file_prefix}CVODEOctWrapper.cpp";
+      print $config_ref->{mkoctfile_command}."\n";
+      system("rm -f ${output_file_prefix}CVODEOctWrapper.oct");
+      system($config_ref->{mkoctfile_command});
+    }
+
+    if ($echo_stdout) {
+	print "$cvode_file_contents";
     }
 }
 
-###print out XPP input file
+###write out XPP input file
 if ($xpp_output) {
     my $xpp_file_name = "$output_file_directory/${output_file_prefix}.ode";
     my $xpp_file_contents;
@@ -489,7 +736,7 @@ if ($xpp_output) {
     close FILE;
   }
 
-### print out AUTO format stuff
+### write out AUTO format stuff
 if ($auto_output) {
     my $AUTO_C_file_name = "$output_file_directory/${output_file_prefix}.c"; # .c file
     my $AUTO_C_file_contents = $model_ref->export_AUTO_file(
@@ -507,7 +754,7 @@ if ($auto_output) {
     close FILE;
 }
 
-###print out SBML
+###write out SBML
 if ($sbml_output) {
     my $sbml_file_name = "$output_file_directory/${output_file_prefix}.sbml";
     my $sbml_file_contents = $model_ref->export_sbml($output_file_prefix);
@@ -522,4 +769,25 @@ if ($sbml_output) {
     print FILE "$sbml_file_contents";
     close FILE;
 }
+
+if ($opt_ref->{run_flag}) {
+    if ($cpp_output && $config_ref->{cpp_ode_solver} eq "cvode") {
+      system($config_ref->{cvode_executable_file});
+    }
+    if ($scipy_output && $config_ref->{scipy_ode_solver} ne "cvode") {
+	my $FACILE_PYTHON_EXE = defined $ENV{FACILE_PYTHON_PATH} ? "$ENV{FACILE_PYTHON_PATH}/python" : "python";
+	print "Running Python/SciPy...\n";
+	system("cd $output_file_directory; $FACILE_PYTHON_EXE -i ${output_file_prefix}Driver.py");
+    }
+    if ($octave_output && $config_ref->{octave_ode_solver}) {
+	print "Running Octave...\n";
+	system("cd $output_file_directory; octave --persist ${output_file_prefix}Driver.m");
+    }
+    if ($matlab_output) {
+	print "Running Matlab...\n";
+	system("cd $output_file_directory; matlab -nodesktop -nosplash -r ${output_file_prefix}Driver");
+    }
+}
+
+print "Facile done.\n\n"
 

@@ -147,11 +147,9 @@ sub parse_eqn_section {
 
 	    # now save constant if not already defined, otherwise check value didn't change
 	    if (!defined $variable_list_ref->lookup_by_name($name)) {
-		my $is_expression_flag;
+		my $is_expression_flag = 0;
 
-		if (is_numeric($value)) {
-		    $is_expression_flag = 0;
-		} else {
+		if (!is_numeric($value)) {
 		    # not a number, so must be a (possibly quoted) expression
 		    if ($value =~ /^\"(.*)\"$/) {
 			# get rid of quotes
@@ -159,6 +157,7 @@ sub parse_eqn_section {
 		    }
 		    $is_expression_flag = 1;
 		}
+
 		# store the value
 		$variable_ref = $variable_list_ref->new_variable({
 		    name => $name,
@@ -168,6 +167,9 @@ sub parse_eqn_section {
 		    dimension => "unknown",
 		    source_line => $line,
 		});
+		
+		# compute dynamic flag
+		$variable_ref->compute_is_dynamic_flag($variable_list_ref);
 	    } else {
 		$variable_ref = $variable_list_ref->lookup_by_name($name);
 		if (!$variable_ref->compare_value($value)) {
@@ -379,10 +381,8 @@ sub parse_rate {
 	}
 	# now save variable if not already defined, otherwise check value didn't change
 	if (!defined $variable_list_ref->lookup_by_name($name)) {
-	    my $is_expression_flag;
-	    if (is_numeric($value)) {
-		$is_expression_flag = 0;
-	    } else {
+	    my $is_expression_flag = 0;
+	    if (!is_numeric($value)) {
 		# not a number, so must be a (possibly quoted) expression
 		if ($value =~ /^\"(.*)\"$/) {
 		    # get rid of quotes
@@ -404,6 +404,9 @@ sub parse_rate {
 		dimension => $dimension,
 		source_line => $source_line,
 	    });
+
+	    # compute dynamic flag
+	    $rate_variable_ref->compute_is_dynamic_flag($variable_list_ref);
 	} else {
 	    $rate_variable_ref = $variable_list_ref->lookup_by_name($name);
 	    if(!$rate_variable_ref->compare_value($value)) {
@@ -646,6 +649,7 @@ sub parse_promoter_section {
 # Read CONFIG section and plug in values, unless user already assigned them on command line
 sub parse_config_section {
     my $self = shift;
+    my $opt_ref = shift;
 
     my $file_buffer_ref = $self->get_file_buffer_ref();
     my $config_ref = $self->get_config_ref();
@@ -653,21 +657,29 @@ sub parse_config_section {
     foreach my $line (@{$file_buffer_ref->{CONFIG}}) {
 	$line =~ s/;$//;   # remove trailing semi-colon
 	if ($line =~ /^t_final\s*=\s*(\S+)/) {
-	    $config_ref->{tf} = $1 unless $main::opt_t;
+	    $config_ref->{tf} = $1 unless defined $opt_ref->{tf};
 	} elsif ($line =~ /compartment_volume\s*=\s*(\S+)/) {
-	    $config_ref->{compartment_volume} = $1 unless $main::opt_C;
+	    $config_ref->{compartment_volume} = $1 unless defined $opt_ref->{compartment_volume};
 	} elsif ($line =~ /^t_vector\s*=\s*(\[.*\])/) {
-	    $config_ref->{tv} = $1 unless $main::opt_v;
+	    $config_ref->{tv} = $1 unless defined $opt_ref->{tv};
 	} elsif ($line =~ /^matlab_ode_solver\s*=\s*(\S+)/) {
-	    $config_ref->{solver} = $1 unless $main::opt_l;
-	} elsif ($line =~ /^matlab_odeset_options\s*=\s*(\S.*)/) {
-	    $config_ref->{solver_options} = $1 unless $main::opt_n;
-	} elsif ($line =~ /^event_times\s*=\s*(\S.*)/) {
-	    print "ERROR: the config variable event_times is deprecated, ".
-	      "use ode_event_times or easystoch_sample_times instead\n";
-	    exit(1);
+	    $config_ref->{matlab_ode_solver} = $1 unless defined $opt_ref->{solver};
+	} elsif ($line =~ /^matlab_solver_options{(\S.*)}\s*=\s*(\S.*)/) {
+	    $config_ref->{matlab_solver_options}{$1} = $2 unless defined $config_ref->{matlab_solver_options}{$1};
+	} elsif ($line =~ /^octave_ode_solver\s*=\s*(\S+)/) {
+	    $config_ref->{octave_ode_solver} = $1 unless defined $opt_ref->{solver};
+	} elsif ($line =~ /^octave_solver_options{(\S.*)}{(\S.*)}\s*=\s*(\S.*)/) {
+	    $config_ref->{octave_solver_options}{$1}{$2} = $3 unless defined $config_ref->{octave_solver_options}{$1}{$2};
+	} elsif ($line =~ /^scipy_ode_solver\s*=\s*(\S+)/) {
+	    $config_ref->{scipy_ode_solver} = $1 unless defined $opt_ref->{solver};
+	} elsif ($line =~ /^scipy_solver_options{(\S.*)}{(\S.*)}\s*=\s*(\S.*)/) {
+	    $config_ref->{scipy_solver_options}{$1}{$2} = $3 unless defined $config_ref->{scipy_solver_options}{$1}{$2};
+	} elsif ($line =~ /^cpp_ode_solver\s*=\s*(\S+)/) {
+	    $config_ref->{cpp_ode_solver} = $1 unless defined $opt_ref->{solver};
+	} elsif ($line =~ /^cpp_solver_options{(\S.*)}{(\S.*)}\s*=\s*(\S.*)/) {
+	    $config_ref->{cpp_solver_options}{$1}{$2} = $3 unless defined $config_ref->{cpp_solver_options}{$1}{$2};
 	} elsif ($line =~ /^ode_event_times\s*=\s*(\S.*)/) {
-	  $config_ref->{ode_event_times} = $1 unless $main::opt_e;
+	  $config_ref->{ode_event_times} = $1 unless defined $opt_ref->{ode_event_times};
 	} elsif ($line =~ /^SS_timescale\s*=\s*(\S.*)/) {
 	    $config_ref->{SS_timescale} = $1;
 	} elsif ($line =~ /^SS_RelTol\s*=\s*(\S.*)/) {
@@ -676,8 +688,54 @@ sub parse_config_section {
 	    $config_ref->{SS_AbsTol} = $1;
 	} elsif ($line =~ /^easystoch_sample_times\s*{(\S+)}\s*=\s*(\S.*)/) {
 	  $config_ref->{easystoch_sample_times}{$1} = $2;
+	} elsif ($line =~ /^external_parameters\s*=\s*(\S.*)/) {
+	    my @externs = split(" ",$1);
+	    my $variable_list_ref = $self->get_variable_list();
+	    foreach my $extern (@externs) {
+		push @{$config_ref->{external_parameters}},$extern;
+		my $variable_ref = $variable_list_ref->lookup_by_name($extern);
+		if (defined $variable_ref) {
+		    $variable_ref->set_is_extern_flag(1);
+		} else {
+		    print "WARNING: variable $extern is undefined but listed as an external parameter\n";
+		}
+	    }
+	} elsif ($line =~ /^external_initial_values\s*=\s*(\S.*)/) {
+	    my @externs = split(" ",$1);
+	    my $node_list_ref = $self->get_node_list();
+	    foreach my $extern (@externs) {
+		push @{$config_ref->{external_initial_conditions}},$extern;
+		my $node_ref = $node_list_ref->lookup_by_name($extern);
+		if (defined $node_ref) {
+		    $node_ref->set_is_extern_flag(1);
+		} else {
+		    print "WARNING: node $extern is undefined but listed as an external initial value\n";
+		}
+	    }
 	} elsif ($line =~ /^@/) {
 	    push @{$config_ref->{xpp_config}}, $line;
+	} elsif ($line =~ /^matlab_odeset_options/) {
+	    print "ERROR: matlab_odeset_options is deprecated, use matlab_solver_options{} instead\n";
+	    exit(1);
+	} elsif ($line =~ /^event_times\s*=\s*(\S.*)/) {
+	    print "ERROR: the config variable event_times is deprecated, ".
+	      "use ode_event_times or easystoch_sample_times instead\n";
+	    exit(1);
+	} elsif ($line =~ /^scipy_solver_options{(\S.*)}\s*=/) {
+	  print "ERROR: incorrect format for solver option specification\n";
+	  print "  (should be scipy_solver_options{solver}{option} = option_value)\n";
+	  print " --> $line\n";
+	  exit(1);
+	} elsif ($line =~ /^octave_solver_options{(\S.*)}\s*=/) {
+	  print "ERROR: incorrect format for solver option specification\n";
+	  print "  (should be octave_solver_options{solver}{option} = option_value)\n";
+	  print " --> $line\n";
+	  exit(1);
+	} elsif ($line =~ /^cpp_solver_options{(\S.*)}\s*=/) {
+	  print "ERROR: incorrect format for solver option specification\n";
+	  print "  (should be cpp_solver_options{solver}{option} = option_value)\n";
+	  print " --> $line\n";
+	  exit(1);
 	} else {
 	    print "ERROR: invalid line in the CONFIG section\n";
 	    print "--> $line\n";

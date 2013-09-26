@@ -1,0 +1,75 @@
+Facile version 0.53
+Copyright (c) 2003-2012, Ollivier, Siso, Swain et al.
+Warning: line does not appear to be a reaction equation, node or variable declaration
+ --> \\ this line should be flagged because wrong comment format
+Warning: a 2nd rate constant was specified when none required in A + B -> C; f1=5; b1=0.1
+Warning: a 2nd rate constant was specified when none required in null -> X; sourceXf = 1; sourceXb = 99
+Warning: a 2nd rate constant was specified when none required in Y -> null ; sinkYf= 9; sinkYb =11
+Warning: a 2nd rate constant was specified when none required in W <- null ; sourceWf = "sin(2*pi*t/0.1)" ; sourceWb= "cos(t)"
+Warning: a 2nd rate constant was specified when none required in null <- Z ; sinkZf=1; sinkZb=1.3
+Warning: rate gg has value of zero
+Warning: missing value for rate constant in assignment M1 -> M2; m1
+Warning: rate m1 has value of zero
+Warning: missing value for rate constant in assignment M2 -> M1 ; m2
+Warning: rate m2 has value of zero
+Warning: initial value specified for node ZZZ which does not appear in equations
+Note: input file for Mathematica is test/examples/testMatlab/testMatlab.ma
+Note: input files for Matlab sims are test/examples/testMatlab/testMatlab_odes.m, test/examples/testMatlab/testMatlabDriver.m, test/examples/testMatlab/testMatlab_s.m, test/examples/testMatlab/testMatlab_r.m
+Facile done.
+
+[?1h=
+                                   < M A T L A B (R) >
+                         Copyright 1984-2009 The MathWorks, Inc.
+                       Version 7.9.0.529 (R2009b) 32-bit (glnx86)
+                                     August 12, 2009
+
+ 
+  To get started, type one of these: helpwin, helpdesk, or demo.
+  For product information, visit www.mathworks.com.
+ 
+sim time is t=1.001254, elapsed time=1.716729
+sim time is t=2.002101, elapsed time=2.765398
+sim time is t=3.002901, elapsed time=3.759876
+sim time is t=4.004676, elapsed time=4.761995
+Facile driver script done
+S0= 
+         0    0.0499    0.0500    0.0500
+
+S1= 
+         0    0.0808    0.0511    0.0388
+
+A= 
+         0    0.2345    0.4250    2.5260
+
+B= 
+         0    0.1008    0.1239    0.0372
+
+C= 
+         0    0.0062    0.0234    0.0511
+
+D= 
+         0    0.2069    0.3875    3.0745
+
+E= 
+  102.0000    4.9462    0.2076    0.0000
+
+F= 
+         0   37.4945   34.1951   34.0000
+
+G= 
+         0   59.5593   67.5973   68.0000
+
+X= 
+         0    0.3026    0.6197    5.0000
+
+Y= 
+    4.4000    0.2888    0.0166    0.0000
+
+w= 
+         0    0.0001    0.0105    0.0000
+
+Z= 
+    5.5000    4.0639    2.9597    0.0371
+
+>> exit
+[?1l>

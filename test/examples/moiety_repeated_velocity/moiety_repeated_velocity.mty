@@ -1,0 +1,39 @@
+the stoichiometry matrix is:
+  1  1
+ -2 -2
+  1  1
+  1  1
+
+
+Matlab kernel:
+  1  0  0 -1
+  0  1  0  2
+  0  0  1 -1
+
+
+Perl kernel (using this kernel):
+  1  0  0 -1
+  0  1  0  2
+ -0 -0  1 -1
+
+
+Check: kernel*stoichiometry should be [0]
+  0  0
+  0  0
+  0  0
+
+
+
+
+The constrained variables are:
+
+d = " - (-1)*e + d_tot", d_tot = 0
+
+b = " - (2)*e + b_tot", b_tot = 100
+
+c = " - (-1)*e + c_tot", c_tot = 0
+
+eqe = + f1*b ;
+eqc = + f1*b ;
+eqb = - f1*b - f1*b ;
+eqd = + f1*b ;

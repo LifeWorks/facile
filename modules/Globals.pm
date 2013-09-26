@@ -25,6 +25,7 @@ use vars qw(@ISA @EXPORT);
 	     $verbose
 	     $AVOGADRO
 	     $pi
+	     $VERSION
 	    );
 
 #######################################################################################
@@ -41,6 +42,8 @@ use vars qw($AVOGADRO);         # Avogadro's number
 
 use vars qw($pi);
 
+use vars qw($VERSION);
+
 #######################################################################################
 # Set default values
 #######################################################################################
@@ -51,6 +54,8 @@ $AVOGADRO = 6.022e23;
 
 # not the same value as Matlab's pi
 $pi = "3\.1415926535898" + 0.0;
+
+$VERSION = "X.XX";
 
 1;
 

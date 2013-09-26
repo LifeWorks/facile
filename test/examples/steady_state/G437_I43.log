@@ -1,0 +1,63 @@
+Facile version 0.53
+Copyright (c) 2003-2012, Ollivier, Siso, Swain et al.
+Note: input files for Matlab sims are test/examples/steady_state/G437_I43_odes.m, test/examples/steady_state/G437_I43Driver.m, test/examples/steady_state/G437_I43_s.m, test/examples/steady_state/G437_I43_r.m, test/examples/steady_state/G437_I43_ode_event.m
+Facile done.
+
+[?1h=
+                                   < M A T L A B (R) >
+                         Copyright 1984-2009 The MathWorks, Inc.
+                       Version 7.9.0.529 (R2009b) 32-bit (glnx86)
+                                     August 12, 2009
+
+ 
+  To get started, type one of these: helpwin, helpdesk, or demo.
+  For product information, visit www.mathworks.com.
+ 
+ode_event: integrating from 0.000000 to steady-state (or to timeout at 200000.000000)
+ode_event: steady-state stopping condition reached at t=16430.000000
+ode_event: integrated from 0.000000 to 16430.000000
+ode_event: integrating from 16430.000000 to steady-state (or to timeout at 200000.000000)
+ode_event: steady-state stopping condition reached at t=17650.000000
+ode_event: integrated from 16430.000000 to 17650.000000
+ode_event: integrating from 17650.000000 to steady-state (or to timeout at 200000.000000)
+ode_event: steady-state stopping condition reached at t=18900.000000
+ode_event: integrated from 17650.000000 to 18900.000000
+ode_event: integrating from 18900.000000 to steady-state (or to timeout at 200000.000000)
+ode_event: steady-state stopping condition reached at t=20170.000000
+ode_event: integrated from 18900.000000 to 20170.000000
+ode_event: integrating from 20170.000000 to steady-state (or to timeout at 200000.000000)
+ode_event: steady-state stopping condition reached at t=21460.000000
+ode_event: integrated from 20170.000000 to 21460.000000
+ode_event: integrating from 21460.000000 to steady-state (or to timeout at 200000.000000)
+ode_event: steady-state stopping condition reached at t=22670.000000
+ode_event: integrated from 21460.000000 to 22670.000000
+ode_event: integrating from 22670.000000 to steady-state (or to timeout at 200000.000000)
+ode_event: steady-state stopping condition reached at t=107830.000000
+ode_event: integrated from 22670.000000 to 107830.000000
+Facile driver script done
+Value of TG0000_1 and Y(:,22) at event times
+
+event_times =
+
+       16430       17650       18900       20170       21460       22670      107830
+
+TG0000_1= 
+  Columns 1 through 5
+
+    13.6129e-006   419.0686e-006   825.2153e-006     1.2304e-003   825.4277e-006
+
+  Columns 6 through 7
+
+   419.8882e-006    13.6129e-006
+
+Y(:,22)= 
+  Columns 1 through 5
+
+    59.7228e-006     5.4032e+000     2.7462e+000     1.8409e+000     2.7462e+000
+
+  Columns 6 through 7
+
+     5.4032e+000    59.1127e-006
+
+>> exit
+[?1l>
