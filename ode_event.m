@@ -294,13 +294,8 @@ for i = 1:length(events)-1
         str=sprintf('ode_event: integrating from %f to steady-state (or to timeout at %f)', last_event_time, timeout);
         disp(str);
         
-        check_steady_state_fh = @(t,y,flag,varargin) check_steady_state(...
-            t,y,flag,odefun,SS_timescale(i),...
-            SS_RelTol(i),SS_AbsTol(i),varargin{:});
-        
-        opt_steady_state = odeset(opt, 'OutputFcn', check_steady_state_fh);
-                
-        [T, Y] = odesolver(odefun, TV, y0, opt_steady_state, varargin{:});
+        [Ts, Ys] = odesolver(odefun, TV, y0, varargin{:});
+        [T, Y] = find_steady_state(Ts, Ys, SS_timescale(i), SS_RelTol(i), SS_AbsTol(i), varargin{:});
         % initial condition for next interval is final value of this one
         y0 = Y(end,:);
         % append results of current interval to final result
@@ -338,28 +333,29 @@ end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Function: check_steady_state
-% Synopsys: Function to pass as OutputFcn in odeset
+% Function: find_steady_state
+% Synopsys: Function to find the steady state point and return corresponding T and Y
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function status = check_steady_state(t,y,flag, ...
-    odefun,SS_timescale,SS_RelTol,SS_AbsTol,varargin)
+function [T, Y] = find_steady_state(t,y,SS_timescale,SS_RelTol,SS_AbsTol,varargin)
 
-% status variable expected by odesolver as return value
-status = 0;
+    T = [];
+    Y = [];
+    y1 = y(:,1:end-1);
+    y2 = y(:,2:end);
+    y0 = y2 - y1;
 
-if strcmp(flag, 'init')
-    %    disp('check_steady_state OutputFcn initialized');
-elseif ~strcmp(flag, 'done')
-    y_end = y(:,end); % for speed
-    dy = odefun(t(:,end),y_end,varargin{:}) * SS_timescale;
-    dy_threshold = SS_RelTol * max(abs(y_end), SS_AbsTol);
-    ss_condition = abs(dy) < dy_threshold;
-    if (ss_condition)
-        str=sprintf('ode_event: steady-state stopping condition reached at t=%f', t(end));
-        disp(str);
-        fast_check_flag = 1;
-        status = 1;
+    length_t = length(t);
+    index = 1;
+    for i = 1:length_t
+        index = i+1;
+        dy = y0(:,i) * SS_timescale;
+        dy_threshold = SS_RelTol * max(abs(y1(:,i)), SS_AbsTol);
+        ss_condition = abs(dy) < dy_threshold;
+        if (condition)
+            break;
+        end
     end
-end
+    T = t(1:index);
+    Y = y(:,1:index);
 end
 
