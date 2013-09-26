@@ -354,7 +354,7 @@ function [T, Y] = find_steady_state(t,y,SS_timescale,SS_RelTol,SS_AbsTol,varargi
         if (ss_condition)
             break;
         end
-        index--;
+        index = i;
     end
     T = t(1:index,:);
     Y = y(1:index,:);
