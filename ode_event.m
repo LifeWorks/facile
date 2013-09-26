@@ -340,23 +340,22 @@ function [T, Y] = find_steady_state(t,y,SS_timescale,SS_RelTol,SS_AbsTol,varargi
 
     T = [];
     Y = [];
-    y1 = y(1:end-1,:);
-    y2 = y(2:end,:);
-    y0 = y2 - y1;
-
+    y_end = y(end,:);
+    y0 = y - y_end;
+    y0_end = y0(end,:);
     ss_condition = false;
-    length_t = length(t(1,:)) - 1;
-    index = 1;
-    for i = 1:length_t
-        index = i+1;
-        dy = y0(i,:) * SS_timescale;
-        dy_threshold = SS_RelTol * max(abs(y1(i,:)), SS_AbsTol);
-        ss_condition = abs(dy) < dy_threshold;
+    length_t = length(y_end);
+    dy_threshold = max(SS_RelTol * abs(y0_end), SS_AbsTol);
+    index = length_t;
+    for j = 1:length_t
+        i = length_t + 1 - j;
+        dy = abs(y0(i,:));
+        ss_condition = dy > dy_threshold;
         if (ss_condition)
             break;
         end
+        index--;
     end
     T = t(1:index,:);
     Y = y(1:index,:);
 end
-
