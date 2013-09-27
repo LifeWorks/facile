@@ -261,9 +261,7 @@ for i = 1:length(events)-1
     if (next_event_time > 0 && next_event_time > last_event_time)  % regular integration interval?
         % use eps() epsilon to avoid an event time being included twice in
         % TV just because of small representation errors in tv
-        TV = [last_event_time ...
-            tv(tv > (last_event_time+eps(last_event_time)) & tv < (next_event_time-eps(next_event_time))) ...
-            next_event_time];
+        TV = [last_event_time next_event_time];
         str=sprintf('ode_event: integrating from %f to %f', last_event_time, next_event_time);
         disp(str);
         % uncomment the following 2 lines to debug integration vector
@@ -287,10 +285,7 @@ for i = 1:length(events)-1
         event_flags(i) = 1;
         % no need to update event_times
     elseif (next_event_time == 0) % integrate to steady-state?
-        TV = [last_event_time ...
-            tv(tv > (last_event_time+eps(last_event_time)) & ...
-            tv < (timeout-eps(timeout))) ...
-            timeout];
+        TV = [last_event_time timeout];
         str=sprintf('ode_event: integrating from %f to steady-state (or to timeout at %f)', last_event_time, timeout);
         disp(str);
         
@@ -341,15 +336,15 @@ function [T, Y] = find_steady_state(t,y,SS_timescale,SS_RelTol,SS_AbsTol,varargi
     T = [];
     Y = [];
     y_end = y(end,:);
-    y0 = bsxfun(@minus, y, y_end);
-    y0_end = y0(end,:);
+    ysub = bsxfun(@minus, y, y_end);
+    ysub_end = ysub(end,:);
     ss_condition = false;
     length_t = length(t);
-    dy_threshold = max(SS_RelTol * abs(y0_end), SS_AbsTol);
+    dy_threshold = max(SS_RelTol * abs(ysub_end), SS_AbsTol);
     index = length_t;
     for j = 1:length_t
         i = length_t + 1 - j;
-        dy = abs(y0(i,:));
+        dy = abs(ysub(i,:));
         ss_condition = dy > dy_threshold;
         if (ss_condition)
             break;
