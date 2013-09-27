@@ -290,7 +290,7 @@ for i = 1:length(events)-1
         disp(str);
         
         [Ts, Ys] = odesolver(odefun, TV, y0, varargin{:});
-        [T, Y] = find_steady_state(Ts, Ys, SS_timescale(i), SS_RelTol(i), SS_AbsTol(i), varargin{:});
+        [T, Y] = find_steady_state(Ts, Ys, SS_RelTol(i), SS_AbsTol(i), varargin{:});
         % initial condition for next interval is final value of this one
         y0 = Y(end,:);
         % append results of current interval to final result
@@ -331,7 +331,7 @@ end
 % Function: find_steady_state
 % Synopsys: Function to find the steady state point and return corresponding T and Y
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [T, Y] = find_steady_state(t,y,SS_timescale,SS_RelTol,SS_AbsTol,varargin)
+function [T, Y] = find_steady_state(t,y,SS_RelTol,SS_AbsTol,varargin)
 
     T = [];
     Y = [];
