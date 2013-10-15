@@ -309,8 +309,8 @@ for i = 1:length(events)-1
             y = Y(end,:);
             t = T(end,1);
         else
-            y(end + 1, :) = Y;
-            t(end + 1, 1) = T;
+            y(end + 1, :) = Y(end,:);
+            t(end + 1, 1) = T(end,1);
         end
         % save length of current interval
         l(i) = length(T);
