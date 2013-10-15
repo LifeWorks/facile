@@ -306,11 +306,11 @@ for i = 1:length(events)-1
         % append results of current interval to final result
         length_t = length(t);
         if length_t == 0
-            y = Y;
-            t = T;
+            y = Y(end,:);
+            t = T(end,1);
         else
-            y(end:end + length(T) - 1, :) = Y;
-            t(end:end + length(T) - 1, 1) = T;
+            y(end + 1, :) = Y;
+            t(end + 1, 1) = T;
         end
         % save length of current interval
         l(i) = length(T);
